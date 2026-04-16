@@ -141,12 +141,59 @@ AI-assisted development log. Required deliverable per SOW Section 4:
 
 ---
 
-## Session 3 — (Stabilization)
+## Session 3 — 2026-04-17 (QA Pass + Feature Upgrades)
 
-_Will cover: UI fixes, reconnection testing, demo prep_
+**Tool:** Claude Code (claude-sonnet-4-6) via CLI  
+**Duration:** ~2h  
+**Mode:** Caveman + Context-mode
+
+### What Claude Code Did
+
+**1. Full code audit — bugs found and fixed**
+
+| Bug | File | Fix |
+|-----|------|-----|
+| Stale React closure | `App.jsx` | `runningRef = useRef(false)` synced alongside `setRunning`; `connectEvents` uses `runningRef.current`, no deps array |
+| Deepgram 3-retry limit | `deepgram.js` | Changed to unlimited retries, exponential backoff capped at 30s |
+| No audio keepalive | `deepgram.js` | Added `keepAlive()` call every 8s to prevent Deepgram idle timeout |
+| WS silent drop (capture) | `capture.js` | Added reconnect loop with `Math.min(10s, 500 * 2^attempts)` backoff |
+| No stream visibility | `App.jsx` | `stream_status` events now update per-speaker status indicators |
+
+**2. Backend feature additions (SOW alignment)**
+
+- **Objection classification**: `coach.js` now outputs `objection_type` field — values: `price / timing / authority / competitor / feature / null`
+- **Call stage detection**: new `call_stage` field — values: `opening / discovery / demo / objection / closing / null`
+- **Prompt caching**: system prompt marked `cache_control: { type: 'ephemeral' }` + `anthropic-beta: prompt-caching-2024-07-31` header → saves ~70% of system prompt tokens on repeated calls
+- **Critical moment fast path**: `watch_out` payload triggers re-coach in 3s instead of 8s
+- **Talk stats**: `transcript.getTalkStats()` returns word count + entry count per speaker; broadcast every 10s
+- **Coaching history**: `coach.getHistory()` stores last 5 snapshots; replayed to new events clients on reconnect
+
+**3. Frontend feature additions**
+
+- `StreamIndicator` component: colored dot (green=connected, yellow=reconnecting, red=error) + live audio level bar (0–100, updates every 200ms via AnalyserNode)
+- Talk ratio bar: Rep vs Prospect word counts shown as percentage bar
+- Coaching badges: `call_stage` + `objection_type` shown on each coaching card
+- Coaching history panel: last 5 suggestions, newest on top (SOW Section 3 requirement)
+- Session timer: elapsed time shown in header
+- Per-speaker Deepgram stream status shown in header
+
+**4. Documentation pass**
+- README.md: architecture diagram updated with 3s bypass footnote; reconnect limitation text fixed
+- DELIVERY.md: demo script updated for new UI features
+- INDEX.md: status updated
+
+### Key Changes vs Session 1/2
+
+| Area | Before | After |
+|------|--------|-------|
+| Coaching output fields | `say_this / ask_this / watch_out` | + `objection_type` + `call_stage` |
+| Deepgram reconnect | 3 retries | Unlimited, exp backoff capped 30s |
+| Stream status | No visibility | Per-speaker dot + level bar |
+| React closure | Stale `running` state | `runningRef` fix |
+| Prompt cost | Full system prompt every call | Cached after first call |
 
 ---
 
 ## Session 4 — (Delivery)
 
-_Will cover: README, demo video, final repo push, submission_
+_Will cover: VM 102 setup, Phase 0 audio test, end-to-end Zoom test, demo video, final submission_

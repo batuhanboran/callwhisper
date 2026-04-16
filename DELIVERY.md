@@ -79,33 +79,37 @@ Open http://localhost:5173, click Start.
 ## Demo Video Outline (3–5 min)
 
 **0:00–0:30 — Setup shot**
-Show: terminal with server running, browser open, BlackHole configured in Zoom settings
+Show: terminal with `docker compose up` output on LXC 100, browser open at callwhisper.batuhanboran.com, Zoom configured with BlackHole as speaker output
 
 **0:30–1:00 — Architecture walkthrough (30s)**
-Say the architecture explanation from PLAN.md while showing the code structure
+Say: "Browser captures mic and Zoom audio separately via BlackHole → WebSocket to Node backend → two Deepgram Nova-2 streams → Claude every 8 seconds → coaching in the UI"
 
 **1:00–1:30 — Start session**
-Click Start button, show both audio devices being selected
+Click Start button, select mic device and BlackHole device from dropdowns
+Point out: header shows two stream indicators (Rep dot + Prospect dot) go green with live level bars
 
 **1:30–3:00 — Live demo**
-Join Zoom call (or play simulated audio)
+Join Zoom call (or play simulated audio from second device)
 Show:
 - Transcript appearing with [Rep] / [Prospect] labels in real time
-- Timestamps on each line
-- Partial transcripts < 2s (point this out verbally)
+- Partial transcripts appearing < 2s (point this out verbally: "already transcribing")
+- Talk ratio bar updating as conversation progresses
 
 **3:00–4:00 — Coaching appearing**
-Show right panel:
-- "Say this: ..."
-- "Ask this: ..."
-- "Watch out: ..." (trigger a price or competitor mention)
-Point out suggestions are contextually relevant to the conversation
+Show right coaching panel:
+- First card appears after ~8s of conversation
+- Show `say_this`, `ask_this`, `watch_out` fields
+- Point out `call_stage` badge (e.g. "discovery") and `objection_type` badge
+- Say a price objection ("that's a bit expensive") → watch_out triggers within 3s (fast path)
+- Show coaching history — last 5 cards stacked newest on top
 
-**4:00–4:30 — Stop session**
-Click Stop, show clean shutdown
+**4:00–4:30 — Disconnect test**
+Temporarily disable network → stream indicators go yellow (reconnecting) → re-enable → back to green automatically
+Point out: "No manual restart needed — unlimited retries with backoff"
 
-**4:30–5:00 — Close**
-Briefly mention known limitations and what would come next (objection classification, RAG, etc.)
+**4:30–5:00 — Stop + close**
+Click Stop, show all streams close cleanly
+Mention: backend runs 24/7 on LXC 100 Docker, accessible at callwhisper.batuhanboran.com
 
 ---
 

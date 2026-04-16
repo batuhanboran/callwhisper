@@ -39,12 +39,15 @@ All planning, execution, and delivery files for the 48h trial task.
 - [x] Phase 0 test script written
 - [x] Push code to GitHub — https://github.com/batuhanboran/callwhisper (private)
 - [x] Deploy backend to LXC 100 Docker — `192.168.1.111:3003` ✓
-- [x] README.md written
-- [x] SESSION_LOG.md updated (Sessions 1 + 2)
+- [x] Cloudflare tunnel: callwhisper.batuhanboran.com → LXC 100:3003 ✓
+- [x] QA pass: stale closure fix, WS reconnect, Deepgram keepalive, unlimited retries
+- [x] Feature upgrades: objection_type, call_stage, prompt caching, talk ratio, coaching history
+- [x] UI upgrades: stream indicators, audio level bars, coaching badges, session timer
+- [x] README.md written + updated
+- [x] SESSION_LOG.md updated (Sessions 1 + 2 + 3)
 - [ ] VM 102 (macOS Sonoma) — uploading
-- [ ] Add @serhatoptimum7 as GitHub collaborator
-- [ ] Cloudflare tunnel: callwhisper.batuhanboran.com → localhost:3003 (CF dashboard)
+- [ ] Add @serhatoptimum7 as GitHub collaborator (GitHub Settings → Collaborators)
 - [ ] Phase 0 audio test on macOS VM
 - [ ] End-to-end Zoom test
-- [ ] Demo video
+- [ ] Demo video recording
 - [ ] Submit
