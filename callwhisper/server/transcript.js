@@ -8,11 +8,9 @@ class TranscriptManager {
   add(entry) {
     this.entries.push(entry);
     this.lastAddedAt = Date.now();
-    // Cap at 300 entries
     if (this.entries.length > 300) this.entries.shift();
   }
 
-  // Returns formatted string of last N seconds for Claude
   getWindow() {
     const cutoff = Date.now() - this.windowSeconds * 1000;
     const recent = this.entries.filter(
@@ -21,14 +19,22 @@ class TranscriptManager {
     return recent.map((e) => `[${e.speaker}]: ${e.text}`).join('\n');
   }
 
-  // Returns all final entries (for history on reconnect)
   getAll() {
     return this.entries.filter((e) => e.is_final);
   }
 
-  // Has new content since given timestamp?
   hasNewSince(tsMs) {
     return this.lastAddedAt > tsMs;
+  }
+
+  getTalkStats() {
+    const finals = this.entries.filter((e) => e.is_final);
+    const stats = (speaker) => {
+      const items = finals.filter((e) => e.speaker === speaker);
+      const words = items.reduce((n, e) => n + e.text.split(/\s+/).filter(Boolean).length, 0);
+      return { entries: items.length, words };
+    };
+    return { rep: stats('Rep'), prospect: stats('Prospect') };
   }
 }
 

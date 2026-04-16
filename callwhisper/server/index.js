@@ -12,11 +12,9 @@ const app = express();
 app.use(cors());
 const server = http.createServer(app);
 
-// Serve built frontend
 app.use(express.static(path.join(__dirname, '../client/dist')));
 app.get('/health', (_, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
-// Three WebSocket endpoints
 const wssRep      = new WebSocketServer({ noServer: true });
 const wssProspect = new WebSocketServer({ noServer: true });
 const wssEvents   = new WebSocketServer({ noServer: true });
@@ -27,7 +25,6 @@ const coaching   = new CoachingEngine(transcript);
 const deepgramRep      = new DeepgramManager('Rep',      transcript, wssEvents);
 const deepgramProspect = new DeepgramManager('Prospect', transcript, wssEvents);
 
-// Route WS upgrades by path
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, `http://${request.headers.host}`);
   if (pathname === '/audio-rep') {
@@ -41,7 +38,6 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-// Rep audio: browser → Deepgram
 wssRep.on('connection', (ws) => {
   console.log('[Server] Rep connected');
   deepgramRep.connect();
@@ -53,7 +49,6 @@ wssRep.on('connection', (ws) => {
   ws.on('error', (err) => console.error('[Server] Rep WS error:', err.message));
 });
 
-// Prospect audio: browser → Deepgram
 wssProspect.on('connection', (ws) => {
   console.log('[Server] Prospect connected');
   deepgramProspect.connect();
@@ -65,19 +60,31 @@ wssProspect.on('connection', (ws) => {
   ws.on('error', (err) => console.error('[Server] Prospect WS error:', err.message));
 });
 
-// Events: server → browser (transcript + coaching)
 wssEvents.on('connection', (ws) => {
   console.log('[Server] Events client connected');
-  // Send history on connect
-  const history = transcript.getAll();
-  if (history.length) {
-    ws.send(JSON.stringify({ type: 'transcript_history', data: history }));
+
+  const txHistory = transcript.getAll();
+  if (txHistory.length) {
+    ws.send(JSON.stringify({ type: 'transcript_history', data: txHistory }));
   }
+
+  const coachHistory = coaching.getHistory();
+  if (coachHistory.length) {
+    ws.send(JSON.stringify({ type: 'coaching_history', data: coachHistory }));
+  }
+
+  ws.send(JSON.stringify({ type: 'stats', data: transcript.getTalkStats() }));
+
   ws.on('close', () => console.log('[Server] Events client disconnected'));
   ws.on('error', (err) => console.error('[Server] Events WS error:', err.message));
 });
 
-// Start coaching engine
+// Broadcast talk stats every 10s
+setInterval(() => {
+  const json = JSON.stringify({ type: 'stats', data: transcript.getTalkStats() });
+  wssEvents.clients.forEach((c) => { if (c.readyState === 1) c.send(json); });
+}, 10000);
+
 coaching.start(wssEvents);
 
 const PORT = process.env.PORT || 3001;
