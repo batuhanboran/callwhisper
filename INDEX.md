@@ -1,0 +1,46 @@
+# CallWhisper — Project Index
+
+All planning, execution, and delivery files for the 48h trial task.
+
+## Planning & Architecture
+
+| File | Purpose |
+|------|---------|
+| [PLAN.md](PLAN.md) | Master plan: task analysis, final architecture, MVP scope, risks, fallbacks |
+| [EXECUTION.md](EXECUTION.md) | 48h execution plan: Phase 0→3, tasks, risks, definition of done per phase |
+| [REPO_STRUCTURE.md](REPO_STRUCTURE.md) | Folder layout, dependencies, env vars, Docker setup, strict 10-step build order |
+| [MACOS_VM_SETUP.md](MACOS_VM_SETUP.md) | Proxmox macOS VM setup guide (OSX-KVM, Sonoma 14, BlackHole) |
+
+## Delivery
+
+| File | Purpose |
+|------|---------|
+| [DELIVERY.md](DELIVERY.md) | Submission checklist, README outline, demo video script, known limitations text |
+| [SESSION_LOG.md](SESSION_LOG.md) | Claude Code session log (required deliverable per SOW Section 4) |
+
+## Source Code
+
+| Path | Purpose |
+|------|---------|
+| [callwhisper/server/index.js](callwhisper/server/index.js) | Express + WS server, 3 endpoints |
+| [callwhisper/server/deepgram.js](callwhisper/server/deepgram.js) | Dual Deepgram streaming connections |
+| [callwhisper/server/transcript.js](callwhisper/server/transcript.js) | Rolling 90s transcript buffer |
+| [callwhisper/server/coach.js](callwhisper/server/coach.js) | Claude coaching engine, 8s throttle |
+| [callwhisper/client/src/App.jsx](callwhisper/client/src/App.jsx) | React UI: transcript + coaching panels |
+| [callwhisper/client/src/capture.js](callwhisper/client/src/capture.js) | Dual getUserMedia, PCM chunking, WS sender |
+| [callwhisper/scripts/test-audio.html](callwhisper/scripts/test-audio.html) | Phase 0 gate: dual audio device test |
+| [callwhisper/docker-compose.yml](callwhisper/docker-compose.yml) | Docker deployment for LXC 100 |
+
+## Current Status
+
+- [x] Architecture decided: LXC 100 backend + VM 102 macOS
+- [x] All backend code written (server/, Dockerfile, docker-compose)
+- [x] Frontend code written (React UI, capture.js)
+- [x] Phase 0 test script written
+- [ ] VM 102 (macOS Sonoma) — installing
+- [ ] Push code to GitHub
+- [ ] Deploy backend to LXC 100 Docker
+- [ ] Phase 0 audio test on macOS VM
+- [ ] End-to-end Zoom test
+- [ ] Demo video
+- [ ] Submit

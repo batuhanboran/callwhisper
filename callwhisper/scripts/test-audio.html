@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CallWhisper — Audio Device Test</title>
+  <style>
+    body { font-family: monospace; background: #0f0f0f; color: #e0e0e0; padding: 20px; }
+    h2 { color: #4fc3f7; }
+    button { margin: 8px 4px; padding: 8px 16px; background: #333; color: #fff; border: 1px solid #555; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #444; }
+    select { background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; padding: 6px; margin: 4px; border-radius: 4px; min-width: 300px; }
+    #log { margin-top: 16px; padding: 12px; background: #1a1a1a; border-radius: 4px; min-height: 200px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+    .ok { color: #a5d6a7; }
+    .err { color: #ef9a9a; }
+    .info { color: #ffe082; }
+    label { display: block; margin: 8px 0 4px; color: #888; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h2>CallWhisper — Phase 0 Audio Test</h2>
+  <p>Tests: enumerate devices, dual simultaneous getUserMedia capture</p>
+  <br>
+  <button onclick="listDevices()">1. List Audio Devices</button>
+  <br><br>
+  <label>Rep (Mic):</label>
+  <select id="micSelect"><option value="">— run list first —</option></select>
+  <label>Prospect (System / BlackHole):</label>
+  <select id="sysSelect"><option value="">— run list first —</option></select>
+  <br>
+  <button onclick="testDual()">2. Test Dual Capture</button>
+  <button onclick="stopAll()">Stop All</button>
+  <div id="log">Waiting...</div>
+
+  <script>
+    let streams = [];
+
+    function log(msg, cls = '') {
+      const el = document.getElementById('log');
+      const ts = new Date().toLocaleTimeString();
+      el.innerHTML += `<span class="${cls}">[${ts}] ${msg}</span>\n`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function listDevices() {
+      try {
+        log('Requesting mic permission...', 'info');
+        await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = devices.filter(d => d.kind === 'audioinput');
+
+        log(`Found ${inputs.length} audio input device(s):`, 'ok');
+        inputs.forEach((d, i) => {
+          const isBlackHole = d.label.toLowerCase().includes('blackhole');
+          log(`  [${i}] ${d.label || '(no label)'} — ${d.deviceId.slice(0, 16)}... ${isBlackHole ? '← BLACKHOLE DETECTED' : ''}`, isBlackHole ? 'ok' : '');
+        });
+
+        const micSel = document.getElementById('micSelect');
+        const sysSel = document.getElementById('sysSelect');
+        micSel.innerHTML = '';
+        sysSel.innerHTML = '';
+
+        inputs.forEach(d => {
+          const opt1 = new Option(d.label || d.deviceId, d.deviceId);
+          const opt2 = new Option(d.label || d.deviceId, d.deviceId);
+          micSel.add(opt1);
+          sysSel.add(opt2);
+        });
+
+        // Auto-select BlackHole for system if found
+        const bh = inputs.find(d => d.label.toLowerCase().includes('blackhole'));
+        if (bh) {
+          sysSel.value = bh.deviceId;
+          log(`Auto-selected BlackHole as system audio device`, 'ok');
+        } else {
+          log('BlackHole NOT found. Install via: brew install blackhole-2ch', 'err');
+        }
+
+      } catch (e) {
+        log('Error: ' + e.message, 'err');
+      }
+    }
+
+    async function testDual() {
+      stopAll();
+      const micId = document.getElementById('micSelect').value;
+      const sysId = document.getElementById('sysSelect').value;
+
+      if (!micId || !sysId) { log('Select both devices first', 'err'); return; }
+      if (micId === sysId) { log('WARNING: Both devices are the same! Select different devices.', 'err'); }
+
+      log('Opening two simultaneous getUserMedia streams...', 'info');
+
+      const constraints = (deviceId) => ({
+        audio: { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        video: false,
+      });
+
+      try {
+        const [s1, s2] = await Promise.all([
+          navigator.mediaDevices.getUserMedia(constraints(micId)),
+          navigator.mediaDevices.getUserMedia(constraints(sysId)),
+        ]);
+
+        streams = [s1, s2];
+
+        const t1 = s1.getAudioTracks()[0];
+        const t2 = s2.getAudioTracks()[0];
+
+        log(`Stream 1 (Rep/Mic): "${t1.label}" — state: ${t1.readyState}`, 'ok');
+        log(`Stream 2 (Prospect/System): "${t2.label}" — state: ${t2.readyState}`, 'ok');
+
+        if (t1.readyState === 'live' && t2.readyState === 'live') {
+          log('✓ PASS: Both streams active simultaneously!', 'ok');
+          log('Phase 0 gate cleared. Ready to proceed to Phase 1.', 'ok');
+        } else {
+          log('✗ FAIL: One or both streams not live', 'err');
+        }
+
+        // Monitor audio levels
+        monitorLevel(s1, 'Rep');
+        monitorLevel(s2, 'Prospect');
+
+      } catch (e) {
+        log('Error opening streams: ' + e.message, 'err');
+      }
+    }
+
+    function monitorLevel(stream, label) {
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      let lastLog = 0;
+      function tick() {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        if (Date.now() - lastLog > 2000) {
+          log(`[${label}] Audio level: ${avg.toFixed(1)} ${avg > 5 ? '🔊 AUDIO DETECTED' : '(silent)'}`, avg > 5 ? 'ok' : 'info');
+          lastLog = Date.now();
+        }
+        if (stream.active) requestAnimationFrame(tick);
+      }
+      tick();
+    }
+
+    function stopAll() {
+      streams.forEach(s => s.getTracks().forEach(t => t.stop()));
+      streams = [];
+      log('All streams stopped', 'info');
+    }
+  </script>
+</body>
+</html>
