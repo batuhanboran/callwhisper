@@ -81,7 +81,7 @@ services:
     container_name: callwhisper-backend
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "3003:3001"
     env_file: .env
     networks:
       - default
@@ -92,8 +92,9 @@ services:
 FROM node:20-slim
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 COPY server/ ./server/
+COPY client/dist/ ./client/dist/
 EXPOSE 3001
 CMD ["node", "server/index.js"]
 ```

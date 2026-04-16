@@ -87,9 +87,57 @@ AI-assisted development log. Required deliverable per SOW Section 4:
 
 ---
 
-## Session 2 — (Next session)
+## Session 2 — 2026-04-17 (Deployment + GitHub)
 
-_Will cover: VM 102 boot, Docker deployment to LXC 100, Phase 0 audio test, Zoom end-to-end test_
+**Tool:** Claude Code (claude-sonnet-4-6) via CLI  
+**Duration:** ~1h  
+**Mode:** Caveman Ultra + Context-mode
+
+### What Claude Code Did
+
+**1. Diagnosed infrastructure via proxmox-docker MCP**
+- SSH landed on Proxmox host (`pve`, 192.168.1.111) not LXC directly
+- Confirmed LXC 100 running, Docker 29.3.1 installed, accessible via `pct exec 100`
+- Found ports 3001 (rss-bridge) and 3002 already allocated → chose **3003**
+
+**2. Fixed Dockerfile for zero-dependency build**
+- Original: single-stage, required pre-built `client/dist/` on host
+- Updated: multi-stage (Stage 1: Vite build inside Docker, Stage 2: node:20-slim runtime)
+- Changed `npm ci` → `npm install` (no package-lock.json present)
+
+**3. Deployed to LXC 100**
+- Packaged source as tar (12KB), SCP to Proxmox host, piped via `pct exec 100 -- tar`
+- Created `.env` on LXC 100 with real API keys
+- `docker compose up --build -d` → built Vite client (~5min), container started
+- Health check: `{"status":"ok"}` at `192.168.1.111:3003/health` ✓
+
+**4. GitHub repo**
+- `git init`, staged 24 files (`.env` excluded by .gitignore ✓)
+- Created repo: https://github.com/batuhanboran/callwhisper (private)
+- Pulled GitHub README, merged, pushed all files
+
+**5. Fixed vite.config.js proxy**
+- Updated WS proxy target: `ws://192.168.1.111:3001` → `ws://192.168.1.111:3003`
+
+**6. Documentation pass**
+- Wrote full README.md (architecture, setup, limitations)
+- Updated INDEX.md (deployment status)
+- Fixed REPO_STRUCTURE.md (port, Dockerfile)
+- Updated SESSION_LOG.md
+
+### Key Decisions
+
+| Decision | Chosen | Reason |
+|----------|--------|--------|
+| Host port | 3003 | 3001 + 3002 already allocated on LXC 100 |
+| Dockerfile | Multi-stage | No Node.js outside Docker on LXC 100 |
+| Build approach | Docker build | Avoids local npm/node dependency on deploy machine |
+| Cloudflare tunnel | CF dashboard (manual) | Token-based tunnel, no local ingress config |
+
+### Remaining (VM 102 dependent)
+- Phase 0 audio test (BlackHole + Chrome dual stream)
+- End-to-end Zoom test
+- Demo video recording
 
 ---
 

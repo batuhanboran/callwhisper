@@ -37,9 +37,13 @@ All planning, execution, and delivery files for the 48h trial task.
 - [x] All backend code written (server/, Dockerfile, docker-compose)
 - [x] Frontend code written (React UI, capture.js)
 - [x] Phase 0 test script written
-- [ ] VM 102 (macOS Sonoma) — installing
-- [ ] Push code to GitHub
-- [ ] Deploy backend to LXC 100 Docker
+- [x] Push code to GitHub — https://github.com/batuhanboran/callwhisper (private)
+- [x] Deploy backend to LXC 100 Docker — `192.168.1.111:3003` ✓
+- [x] README.md written
+- [x] SESSION_LOG.md updated (Sessions 1 + 2)
+- [ ] VM 102 (macOS Sonoma) — uploading
+- [ ] Add @serhatoptimum7 as GitHub collaborator
+- [ ] Cloudflare tunnel: callwhisper.batuhanboran.com → localhost:3003 (CF dashboard)
 - [ ] Phase 0 audio test on macOS VM
 - [ ] End-to-end Zoom test
 - [ ] Demo video

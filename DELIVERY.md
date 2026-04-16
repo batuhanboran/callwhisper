@@ -3,13 +3,13 @@
 ## Submission Checklist
 
 ### Required Deliverables
-- [ ] Private GitHub repo created
-- [ ] Repo shared with @serhatoptimum7
-- [ ] README.md with setup instructions
-- [ ] README.md with architecture decisions
-- [ ] README.md with known limitations
+- [x] Private GitHub repo created — https://github.com/batuhanboran/callwhisper
+- [ ] Repo shared with @serhatoptimum7 — add via GitHub Settings → Collaborators
+- [x] README.md with setup instructions
+- [x] README.md with architecture decisions
+- [x] README.md with known limitations
 - [ ] 3–5 min demo video showing tool working on test call
-- [ ] AI session logs or screen recording of build process (Claude Code session)
+- [x] AI session logs (SESSION_LOG.md — Sessions 1 + 2 complete)
 
 ### Minimum Pass Bar
 - [ ] Two audio streams captured separately (mic = Rep, system audio = Prospect)
@@ -138,10 +138,10 @@ Use this exact text — honest, shows you know the tradeoffs:
 
 ## Private Repo Checklist
 
-- [ ] `.env` in `.gitignore`
-- [ ] `.env.example` committed with placeholder values
-- [ ] No API keys hardcoded anywhere
-- [ ] README.md at root
-- [ ] All source committed (no `node_modules`)
-- [ ] Repo set to Private
-- [ ] @serhatoptimum7 added as collaborator
+- [x] `.env` in `.gitignore`
+- [x] `.env.example` committed with placeholder values
+- [x] No API keys hardcoded anywhere
+- [x] README.md at root
+- [x] All source committed (no `node_modules`)
+- [x] Repo set to Private
+- [ ] @serhatoptimum7 added as collaborator (manual: GitHub Settings → Collaborators)
