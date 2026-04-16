@@ -1,7 +1,7 @@
 const BACKEND_WS = import.meta.env.VITE_BACKEND_WS || '';
 const SAMPLE_RATE = 16000;
+const RECONNECT_MAX_DELAY = 10000;
 
-// Convert Float32 PCM to Int16 PCM (Deepgram linear16 format)
 function float32ToInt16(float32Array) {
   const int16 = new Int16Array(float32Array.length);
   for (let i = 0; i < float32Array.length; i++) {
@@ -11,42 +11,78 @@ function float32ToInt16(float32Array) {
   return int16;
 }
 
-async function createAudioSender(stream, wsPath) {
+async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
   const wsUrl = BACKEND_WS ? `${BACKEND_WS}${wsPath}` : wsPath;
-  const ws = new WebSocket(wsUrl);
-  ws.binaryType = 'arraybuffer';
+  let ws = null;
+  let stopped = false;
+  let reconnectAttempts = 0;
+  let reconnectTimer = null;
 
   const audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
   const source = audioCtx.createMediaStreamSource(stream);
-
-  // ScriptProcessor: widely supported, sufficient for prototype
   const processor = audioCtx.createScriptProcessor(4096, 1, 1);
 
+  // Level monitoring
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  source.connect(analyser);
+  const levelBuf = new Uint8Array(analyser.frequencyBinCount);
+  const levelInterval = setInterval(() => {
+    analyser.getByteFrequencyData(levelBuf);
+    const avg = levelBuf.reduce((a, b) => a + b, 0) / levelBuf.length;
+    onLevel?.(Math.min(100, Math.round(avg * 2)));
+  }, 200);
+
+  function connect() {
+    if (stopped) return;
+    ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      reconnectAttempts = 0;
+      console.log(`[Capture] WS open: ${wsPath}`);
+      onStatus?.('connected');
+    };
+
+    ws.onerror = () => onStatus?.('error');
+
+    ws.onclose = () => {
+      console.log(`[Capture] WS closed: ${wsPath}`);
+      if (!stopped) {
+        const delay = Math.min(RECONNECT_MAX_DELAY, 500 * Math.pow(2, reconnectAttempts));
+        reconnectAttempts++;
+        onStatus?.('reconnecting');
+        reconnectTimer = setTimeout(connect, delay);
+      }
+    };
+  }
+
+  connect();
+
   processor.onaudioprocess = (e) => {
-    if (ws.readyState !== WebSocket.OPEN) return;
-    const float32 = e.inputBuffer.getChannelData(0);
-    const int16 = float32ToInt16(float32);
-    ws.send(int16.buffer);
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(float32ToInt16(e.inputBuffer.getChannelData(0)).buffer);
   };
 
   source.connect(processor);
   processor.connect(audioCtx.destination);
 
-  ws.onopen = () => console.log(`[Capture] WS open: ${wsPath}`);
-  ws.onerror = (e) => console.error(`[Capture] WS error: ${wsPath}`, e);
-  ws.onclose = () => console.log(`[Capture] WS closed: ${wsPath}`);
-
   return {
     stop() {
+      stopped = true;
+      clearTimeout(reconnectTimer);
+      clearInterval(levelInterval);
       processor.disconnect();
       source.disconnect();
+      analyser.disconnect();
       audioCtx.close();
-      ws.close();
+      ws?.close();
+      onStatus?.('stopped');
     },
   };
 }
 
-export async function startCapture(micDeviceId, systemDeviceId) {
+export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}) {
   const constraints = (deviceId) => ({
     audio: {
       deviceId: { exact: deviceId },
@@ -65,8 +101,14 @@ export async function startCapture(micDeviceId, systemDeviceId) {
   ]);
 
   const [repSender, prospectSender] = await Promise.all([
-    createAudioSender(micStream, '/audio-rep'),
-    createAudioSender(sysStream, '/audio-prospect'),
+    createAudioSender(micStream, '/audio-rep', {
+      onStatus: (s) => callbacks.onRepStatus?.(s),
+      onLevel:  (v) => callbacks.onRepLevel?.(v),
+    }),
+    createAudioSender(sysStream, '/audio-prospect', {
+      onStatus: (s) => callbacks.onProspectStatus?.(s),
+      onLevel:  (v) => callbacks.onProspectLevel?.(v),
+    }),
   ]);
 
   return {

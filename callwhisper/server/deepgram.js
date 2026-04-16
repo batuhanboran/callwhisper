@@ -1,17 +1,20 @@
 const { createClient, LiveTranscriptionEvents } = require('@deepgram/sdk');
 
+const KEEPALIVE_INTERVAL = 8000;  // ms — prevent Deepgram idle timeout
+const RECONNECT_MAX_DELAY = 30000;
+
 class DeepgramManager {
   constructor(speaker, transcript, wssEvents) {
-    this.speaker = speaker; // 'Rep' or 'Prospect'
+    this.speaker = speaker;
     this.transcript = transcript;
     this.wssEvents = wssEvents;
     this.client = createClient(process.env.DEEPGRAM_API_KEY);
     this.connection = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
-    this.maxReconnects = 3;
     this.pendingAudio = [];
     this.active = false;
+    this.keepAliveTimer = null;
   }
 
   connect() {
@@ -21,7 +24,7 @@ class DeepgramManager {
   }
 
   _open() {
-    console.log(`[Deepgram] Opening ${this.speaker} stream...`);
+    console.log(`[Deepgram] Opening ${this.speaker} stream (attempt ${this.reconnectAttempts + 1})...`);
 
     this.connection = this.client.listen.live({
       model: 'nova-2',
@@ -36,12 +39,18 @@ class DeepgramManager {
     });
 
     this.connection.on(LiveTranscriptionEvents.Open, () => {
-      console.log(`[Deepgram] ${this.speaker} stream open`);
+      console.log(`[Deepgram] ${this.speaker} connected`);
       this.isConnected = true;
       this.reconnectAttempts = 0;
+
       // Flush buffered audio
       this.pendingAudio.forEach((chunk) => this.connection.send(chunk));
       this.pendingAudio = [];
+
+      // Keepalive — prevents Deepgram from closing idle connection
+      this._startKeepalive();
+
+      this._broadcastStatus('connected');
     });
 
     this.connection.on(LiveTranscriptionEvents.Transcript, (data) => {
@@ -53,6 +62,7 @@ class DeepgramManager {
         text: alt.transcript.trim(),
         timestamp: new Date().toISOString(),
         is_final: data.is_final === true,
+        confidence: alt.confidence ?? null,
       };
 
       if (entry.is_final) {
@@ -65,18 +75,39 @@ class DeepgramManager {
 
     this.connection.on(LiveTranscriptionEvents.Error, (err) => {
       console.error(`[Deepgram] ${this.speaker} error:`, err.message || err);
+      this._broadcastStatus('error');
     });
 
     this.connection.on(LiveTranscriptionEvents.Close, () => {
       console.log(`[Deepgram] ${this.speaker} stream closed`);
       this.isConnected = false;
-      if (this.active && this.reconnectAttempts < this.maxReconnects) {
+      this._stopKeepalive();
+
+      if (this.active) {
+        // Unlimited retries with exponential backoff, capped at 30s
+        const delay = Math.min(RECONNECT_MAX_DELAY, 1500 * Math.pow(1.5, this.reconnectAttempts));
         this.reconnectAttempts++;
-        const delay = this.reconnectAttempts * 1500;
-        console.log(`[Deepgram] ${this.speaker} reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
+        console.log(`[Deepgram] ${this.speaker} reconnect in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
+        this._broadcastStatus('reconnecting');
         setTimeout(() => this._open(), delay);
       }
     });
+  }
+
+  _startKeepalive() {
+    this._stopKeepalive();
+    this.keepAliveTimer = setInterval(() => {
+      if (this.isConnected && this.connection) {
+        try { this.connection.keepAlive(); } catch (_) {}
+      }
+    }, KEEPALIVE_INTERVAL);
+  }
+
+  _stopKeepalive() {
+    if (this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+    }
   }
 
   send(audioChunk) {
@@ -90,13 +121,18 @@ class DeepgramManager {
   disconnect() {
     this.active = false;
     this.isConnected = false;
-    this.reconnectAttempts = this.maxReconnects;
+    this._stopKeepalive();
     if (this.connection) {
       try { this.connection.finish(); } catch (_) {}
       this.connection = null;
     }
     this.pendingAudio = [];
     console.log(`[Deepgram] ${this.speaker} disconnected`);
+    this._broadcastStatus('disconnected');
+  }
+
+  _broadcastStatus(status) {
+    this._broadcast({ type: 'stream_status', speaker: this.speaker, status });
   }
 
   _broadcast(message) {

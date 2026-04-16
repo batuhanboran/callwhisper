@@ -75,7 +75,15 @@ wssEvents.on('connection', (ws) => {
 
   ws.send(JSON.stringify({ type: 'stats', data: transcript.getTalkStats() }));
 
-  ws.on('close', () => console.log('[Server] Events client disconnected'));
+  // Ping every 30s to keep connection alive through proxies
+  const pingTimer = setInterval(() => {
+    if (ws.readyState === 1) ws.ping();
+  }, 30000);
+
+  ws.on('close', () => {
+    clearInterval(pingTimer);
+    console.log('[Server] Events client disconnected');
+  });
   ws.on('error', (err) => console.error('[Server] Events WS error:', err.message));
 });
 
