@@ -97,7 +97,6 @@ export default function App() {
   // Deepgram handshake status (from server stream_status events)
   const [deepgramRep, setDeepgramRep] = useState('waiting');
   const [deepgramProspect, setDeepgramProspect] = useState('waiting');
-  const transcriptEndRef = useRef(null);
   const wsRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -113,13 +112,7 @@ export default function App() {
       .catch((e) => setStatusMsg('Mic permission denied: ' + e.message));
   }, []);
 
-  useEffect(() => {
-    if (transcriptEndRef.current) {
-      transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [transcript]);
-
-  useEffect(() => {
+useEffect(() => {
     if (running) {
       setSessionSecs(0);
       timerRef.current = setInterval(() => setSessionSecs((s) => s + 1), 1000);
@@ -139,15 +132,15 @@ export default function App() {
       if (msg.type === 'transcript') {
         setTranscript((prev) => {
           if (!msg.data.is_final) {
-            const last = prev[prev.length - 1];
-            if (last && !last.is_final && last.speaker === msg.data.speaker) {
-              return [...prev.slice(0, -1), msg.data];
+            const first = prev[0];
+            if (first && !first.is_final && first.speaker === msg.data.speaker) {
+              return [msg.data, ...prev.slice(1)];
             }
           }
-          return [...prev, msg.data];
+          return [msg.data, ...prev].slice(0, 100);
         });
       } else if (msg.type === 'transcript_history') {
-        setTranscript(msg.data);
+        setTranscript([...msg.data].reverse().slice(0, 100));
       } else if (msg.type === 'coaching') {
         setCoachingHistory((prev) => [msg.data, ...prev].slice(0, 5));
       } else if (msg.type === 'coaching_history') {
@@ -285,7 +278,6 @@ export default function App() {
                 {entry.text}
               </div>
             ))}
-            <div ref={transcriptEndRef} />
           </div>
         </div>
 
