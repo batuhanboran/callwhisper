@@ -44,10 +44,12 @@ All planning, execution, and delivery files for the 48h trial task.
 - [x] Feature upgrades: objection_type, call_stage, prompt caching, talk ratio, coaching history
 - [x] UI upgrades: stream indicators, audio level bars, coaching badges, session timer
 - [x] README.md written + updated
-- [x] SESSION_LOG.md updated (Sessions 1 + 2 + 3)
-- [ ] VM 102 (macOS Sonoma) — uploading
+- [x] SESSION_LOG.md updated (Sessions 1 + 2 + 3 + 4)
+- [x] VM 102 (macOS Sonoma) — installed, macOS Sonoma 14.8.5 running, account macpc/1234
 - [ ] Add @serhatoptimum7 as GitHub collaborator (GitHub Settings → Collaborators)
-- [ ] Phase 0 audio test on macOS VM
+- [x] Phase 0 audio test on macOS VM — PASSED (two streams, BlackHole detected)
+- [x] Chrome + Zoom installed on macOS VM
+- [x] SSH key auth configured (macpc@192.168.1.110, no password)
 - [ ] End-to-end Zoom test
 - [ ] Demo video recording
 - [ ] Submit

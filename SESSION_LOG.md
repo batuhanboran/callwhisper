@@ -194,6 +194,106 @@ AI-assisted development log. Required deliverable per SOW Section 4:
 
 ---
 
-## Session 4 — (Delivery)
+## Session 4 — 2026-04-17 (macOS VM 102 Install)
 
-_Will cover: VM 102 setup, Phase 0 audio test, end-to-end Zoom test, demo video, final submission_
+**Tool:** Claude Code (claude-sonnet-4-6) via CLI
+**Duration:** ~1.5h
+**Mode:** Caveman Ultra + Context-mode
+
+### What Claude Code Did
+
+**1. Diagnosed VM 102 config vs reference guide**
+- SSHed into PVE host (192.168.1.111), read `/etc/pve/qemu-server/102.conf`
+- Fetched nicksherlock Ventura/Proxmox guide for comparison
+- Found 3 critical errors in original config
+
+**2. Bugs found and fixed**
+
+| Bug | Fix |
+|-----|-----|
+| Missing `-device isa-applesmc,osk="..."` | Added OSK from OSX-KVM project |
+| Missing `-smbios type=2` | Added to args |
+| OpenCore mounted as `media=cdrom` | Changed to `cache=unsafe`, moved to VM images dir |
+| `cpu: kvm64` | Changed to `cpu: host` |
+| OpenCore in ISO store (Proxmox rejects non-cdrom) | Copied to `/var/lib/vz/images/102/vm-102-disk-3.raw` |
+
+**3. macOS Sonoma 14.8.5 installed**
+- VM started successfully with fixed config
+- Booted into macOS Recovery → Disk Utility → formatted 64GB VirtIO as APFS "Macintosh HD"
+- Ran "Reinstall macOS Sonoma" → 2-3 reboots → setup wizard
+- Created account: `macpc` / `1234`
+- macOS desktop reached ✓
+
+### Account & Config Reference
+- **VM ID:** 102, PVE host: 192.168.1.111
+- **macOS user:** macpc / 1234
+- **OpenCore:** `vm-102-disk-3.raw` (OpenCore-custom.img, 150MB)
+- **Main disk:** `vm-102-disk-1.qcow2` (64GB, Macintosh HD APFS)
+
+### Remaining
+- Install Homebrew + BlackHole-2ch
+- Install Chrome + Zoom
+- Phase 0 audio test
+- End-to-end Zoom test + demo video
+
+---
+
+## Session 5 — 2026-04-17 (macOS VM Setup + Phase 0 Pass)
+
+**Tool:** Claude Code (claude-sonnet-4-6) via CLI  
+**Duration:** ~1.5h  
+**Mode:** Caveman Ultra + Context-mode
+
+### What Claude Code Did
+
+**1. Fixed VM 102 audio device**
+- VM had no audio device → BlackHole install would work but no audio passthrough
+- Added via PVE: `qm set 102 -audio0 device=ich9-intel-hda,driver=none`
+- Note: `driver=spice` fails — VM uses vmware VGA, not SPICE display
+
+**2. SSH key auth configured for macOS VM**
+- Generated `~/.ssh/id_ed25519` on Windows dev machine
+- Copied public key to `macpc@192.168.1.110:~/.ssh/authorized_keys`
+- No more password prompts for macOS VM SSH
+
+**3. Installed Homebrew on macOS VM**
+- Path: `/usr/local/bin/brew` (Intel Mac — NOT `/opt/homebrew`)
+- Used `NONINTERACTIVE=1` + pre-cached sudo credentials via `-tt` SSH
+
+**4. Installed BlackHole-2ch**
+- Brew cask install requires passwordless sudo (installer runs as root)
+- Fixed: added `macpc ALL=(ALL) NOPASSWD: ALL` to `/etc/sudoers`
+- Install successful: `BlackHole2ch-0.6.1.pkg` installed, VM rebooted
+
+**5. Installed Chrome + Zoom**
+- Chrome: downloaded `.pkg` via curl, installed with `sudo installer`
+- Zoom: downloaded `ZoomInstallerIT.pkg`, installed same way
+
+**6. Phase 0 audio test — PASSED ✓**
+- Served `test-audio.html` from macOS VM via `python3 -m http.server 8080`
+- Opened `http://localhost:8080/test-audio.html` in Chrome on VM (noVNC)
+- Both streams detected: mic + BlackHole 2ch
+- Audio level detected on BlackHole stream when playing audio
+- **Phase 0 gate passed — two simultaneous MediaStream objects confirmed**
+
+**7. Confirmed backend healthy**
+- PVE SSH key: `C:\Users\BaronPC\ProxmoxMCP\ssh_key` → connects to PVE host
+- `pct exec 100 -- docker ps` → `callwhisper-backend: Up 13h`
+- Health check: `{"status":"ok"}` at `localhost:3003/health` ✓
+
+### Key Infrastructure Notes
+
+| Item | Detail |
+|------|--------|
+| PVE host SSH | `ssh -i C:\Users\BaronPC\ProxmoxMCP\ssh_key root@192.168.1.111` |
+| macOS VM SSH | `ssh macpc@192.168.1.110` (key auth, no password) |
+| LXC 100 exec | `pct exec 100 -- <command>` from PVE host |
+| Brew path (Intel) | `/usr/local/bin/brew` |
+| BlackHole pkg | `/usr/local/Caskroom/blackhole-2ch/0.6.1/BlackHole2ch-0.6.1.pkg` |
+| noVNC audio | Not supported — browser VNC has no audio channel |
+
+### Remaining
+- End-to-end Zoom test (open callwhisper.batuhanboran.com in Chrome on VM, join Zoom)
+- Demo video recording
+- Add @serhatoptimum7 as GitHub collaborator
+- Submit

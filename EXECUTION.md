@@ -8,7 +8,7 @@ Total: 48h. Bias: ship working, not polished.
 
 **Goal:** macOS VM running with audio, LXC 100 backend slot ready, prove two audio streams work.
 
-### Task 0.1 — Create macOS VM on Proxmox (2-3h)
+### ✅ Task 0.1 — Create macOS VM on Proxmox (DONE — 2026-04-17)
 1. Download macOS Sonoma installer via OSX-KVM fetch script (see MACOS_VM_SETUP.md)
 2. Proxmox → Create VM (ID 102)
    - RAM: 4096MB, Disk: 50GB (local-lvm), CPU: 2 cores, vmbr0

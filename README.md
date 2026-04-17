@@ -1,6 +1,6 @@
 # CallWhisper
 
-Real-time AI sales coaching during Zoom calls. Captures rep mic + Zoom system audio simultaneously, transcribes both streams live via Deepgram, and feeds rolling context into Claude every 8 seconds to generate actionable coaching suggestions.
+Real-time AI sales coaching during Zoom calls. Captures rep mic + Zoom system audio simultaneously, transcribes both streams live via Deepgram, and feeds rolling context into Gemini every 8 seconds to generate actionable coaching suggestions.
 
 ## Architecture
 
@@ -8,22 +8,25 @@ Real-time AI sales coaching during Zoom calls. Captures rep mic + Zoom system au
 macOS (Chrome browser)
   ├── mic stream ──────────────────────────┐
   └── BlackHole stream (Zoom audio) ───────┤
-                                           ↓ WebSocket (ws://192.168.1.111:3003)
-                         callwhisper-backend (Docker, LXC 100)
+                                           ↓ WebSocket binary (PCM 16kHz mono)
+                         callwhisper-backend (Docker, LXC 100 / :3003)
                            ├── /audio-rep    → Deepgram Nova-2 (Rep stream)
                            ├── /audio-prospect → Deepgram Nova-2 (Prospect stream)
                            ├── transcript.js → rolling 90s buffer, speaker labels
-                           └── coach.js      → Claude Sonnet every 8s
-                                           ↓ WebSocket /events
+                           └── coach.js      → Gemini 2.0 Flash every 8s*
+                                           ↓ WebSocket /events (JSON)
                          macOS (Chrome browser)
                            ├── Left panel:  live transcript [Rep] / [Prospect]
-                           └── Right panel: Say this / Ask this / Watch out
+                           ├── Right panel: coaching history (last 5, newest on top)
+                           └── Header:      stream status · audio levels · talk ratio
 ```
+
+*Critical moments (watch_out fired) trigger immediate re-coaching at 3s instead of 8s.
 
 **Why this stack:**
 - BlackHole: free virtual audio driver, routes Zoom output to Chrome input
 - Deepgram Nova-2: streaming API, partial transcripts under 2s
-- Claude Sonnet 4.6: structured JSON output, required by project spec
+- Gemini 2.0 Flash: structured JSON output, required by project spec
 - Browser + Node: no Electron compile step, fast iteration
 
 ## Prerequisites
@@ -42,7 +45,7 @@ brew install blackhole-2ch
 # Backend
 npm install
 cp .env.example .env
-# fill in DEEPGRAM_API_KEY and ANTHROPIC_API_KEY
+# fill in DEEPGRAM_API_KEY and GEMINI_API_KEY
 
 # Frontend
 cd client
@@ -53,9 +56,9 @@ npm install
 
 ```bash
 DEEPGRAM_API_KEY=your_key
-ANTHROPIC_API_KEY=your_key
+GEMINI_API_KEY=your_key
 PORT=3001
-COACHING_INTERVAL_MS=8000   # Claude called every 8s
+COACHING_INTERVAL_MS=8000   # Gemini called every 8s
 TRANSCRIPT_WINDOW_S=90      # rolling context window
 ```
 
@@ -94,11 +97,11 @@ This is Phase 0 gate. Do not proceed without passing it.
 
 - **No session persistence**: Transcripts and coaching live in memory only. Restart clears all state.
 
-- **Coaching latency**: Claude API adds 1–3s on top of transcription. Total end-to-end ~4–5s from speech to suggestion.
+- **Coaching latency**: Gemini API adds 1–3s on top of transcription. Total end-to-end ~4–5s from speech to suggestion.
 
 - **No diarization within stream**: Speaker ID is by audio source (stream 1 = Rep, stream 2 = Prospect). Cross-talk within one stream is not separated.
 
-- **No reconnection persistence**: If a Deepgram WebSocket drops and reconnects, transcript history is not replayed.
+- **No reconnection persistence**: If a Deepgram WebSocket drops, it reconnects automatically (unlimited retries, exponential backoff) but transcript history from before the drop is not replayed.
 
 - **macOS only**: Not tested on Windows or Linux.
 

@@ -9,7 +9,7 @@
 - [x] README.md with architecture decisions
 - [x] README.md with known limitations
 - [ ] 3–5 min demo video showing tool working on test call
-- [x] AI session logs (SESSION_LOG.md — Sessions 1 + 2 complete)
+- [x] AI session logs (SESSION_LOG.md — Sessions 1 + 2 + 3 + 4 complete)
 
 ### Minimum Pass Bar
 - [ ] Two audio streams captured separately (mic = Rep, system audio = Prospect)

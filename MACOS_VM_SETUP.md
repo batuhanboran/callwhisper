@@ -1,5 +1,99 @@
 # macOS VM on Proxmox — Setup Guide
 
+## ✅ COMPLETED — VM 102 Running macOS Sonoma 14.8.5
+
+**Status:** macOS Sonoma installed and desktop accessible as of 2026-04-17.
+
+### Working VM Config (`/etc/pve/qemu-server/102.conf`)
+
+```
+agent: 0
+balloon: 0
+bios: ovmf
+boot: order=ide0;virtio0;ide2;net0
+cores: 4
+cpu: host
+efidisk0: local:102/vm-102-disk-0.qcow2,efitype=4m,size=528K
+ide0: local:102/vm-102-disk-3.raw,cache=unsafe
+ide2: local:102/vm-102-disk-2.raw,cache=unsafe
+machine: q35
+memory: 8192
+name: macos-sonoma
+net0: virtio=BC:24:11:03:D8:94,bridge=vmbr0
+numa: 0
+ostype: other
+scsihw: virtio-scsi-single
+smbios1: uuid=5b6b4135-f2aa-4858-9398-98d3a6d26217
+sockets: 1
+tablet: 0
+vga: vmware
+virtio0: local:102/vm-102-disk-1.qcow2,discard=on,iothread=1,size=64G
+vmgenid: 39a269d4-5548-4a22-af7f-37517973a963
+args: -device isa-applesmc,osk="ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc" -smbios type=2 -cpu Skylake-Client-v4,vendor=GenuineIntel,+invtsc,+hypervisor,kvm=on,vmware-cpuid-freq=on -device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0 -device usb-tablet,bus=xhci.0 -global nec-usb-xhci.msi=off -global ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off
+```
+
+### Disk Layout
+| File | Role |
+|------|------|
+| `vm-102-disk-0.qcow2` | EFI disk (528K) |
+| `vm-102-disk-1.qcow2` | macOS main disk (64GB, Macintosh HD APFS) |
+| `vm-102-disk-2.raw` | macOS BaseSystem installer (3GB, keep for recovery) |
+| `vm-102-disk-3.raw` | OpenCore-custom bootloader (150MB, copied from ISO store) |
+
+### macOS Account
+| Field | Value |
+|-------|-------|
+| Full name | macpc |
+| Account name | macpc |
+| Password | 1234 |
+
+### Key Fixes Applied (vs original broken config)
+1. **OSK missing** → added `-device isa-applesmc,osk="ourhardwork..."` to args
+2. **`-smbios type=2` missing** → added to args
+3. **OpenCore mounted as `media=cdrom`** → changed to `cache=unsafe`, moved from ISO store to VM images dir (Proxmox rejects ISO-store files without `media=cdrom`)
+4. **`cpu: kvm64`** → changed to `host`
+
+### Boot Procedure (each VM start)
+OpenCore picker appears → select:
+- **macOS Installer** — if install still in progress
+- **Macintosh HD** — normal boot to desktop
+
+### Completed Setup (Session 5)
+- ✅ SSH key auth: `ssh macpc@192.168.1.110` (no password, key at `~/.ssh/id_ed25519`)
+- ✅ Homebrew installed at `/usr/local/bin/brew` (Intel path)
+- ✅ Sudoers: `macpc ALL=(ALL) NOPASSWD: ALL` (required for brew cask installs)
+- ✅ BlackHole-2ch 0.6.1 installed
+- ✅ Chrome installed (via `googlechrome.pkg`)
+- ✅ Zoom Workplace installed (via `ZoomInstallerIT.pkg`)
+- ✅ Phase 0 audio test PASSED — two simultaneous streams confirmed in Chrome
+
+### Audio Device Fix
+VM 102 had no audio device by default. Added via PVE shell:
+```bash
+qm set 102 -audio0 device=ich9-intel-hda,driver=none
+```
+**Note:** `driver=spice` fails — VM uses `vga: vmware`, not SPICE display.
+
+### SSH from Windows to macOS VM
+```bash
+ssh macpc@192.168.1.110   # key auth, no password prompt
+```
+
+### Brew Install Notes
+- Intel macOS VM → Homebrew at `/usr/local/bin/brew` (NOT `/opt/homebrew`)
+- Brew cask installs need passwordless sudo — added to `/etc/sudoers`
+- Run brew as user (macpc), NOT root
+
+### Phase 0 Test (PASSED)
+Served from VM itself:
+```bash
+ssh macpc@192.168.1.110 'cd /tmp && python3 -m http.server 8080 &'
+# Then in Chrome on VM: http://localhost:8080/test-audio.html
+```
+Result: mic + BlackHole 2ch both listed, audio level detected on BlackHole stream.
+
+---
+
 ## Which macOS to Use
 
 **Use: macOS Sonoma 14**
