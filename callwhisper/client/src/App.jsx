@@ -127,7 +127,7 @@ useEffect(() => {
 
   const connectEvents = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState < 2) wsRef.current.close();
-    const wsUrl = BACKEND_WS ? `${BACKEND_WS}/events` : `ws://${window.location.host}/events`;
+    const wsUrl = BACKEND_WS ? `${BACKEND_WS}/events` : `/events`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
