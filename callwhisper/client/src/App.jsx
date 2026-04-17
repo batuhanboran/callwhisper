@@ -88,6 +88,7 @@ export default function App() {
   const [micId, setMicId] = useState('');
   const [sysId, setSysId] = useState('');
   const [coachModel, setCoachModel] = useState('gemini-2.0-flash');
+  const coachModelRef = useRef('gemini-2.0-flash');
   const [statusMsg, setStatusMsg] = useState('Ready');
   const [sessionSecs, setSessionSecs] = useState(0);
   const [repStreamStatus, setRepStreamStatus] = useState('stopped');
@@ -98,6 +99,8 @@ export default function App() {
   const [deepgramRep, setDeepgramRep] = useState('waiting');
   const [deepgramProspect, setDeepgramProspect] = useState('waiting');
   const wsRef = useRef(null);
+
+  useEffect(() => { coachModelRef.current = coachModel; }, [coachModel]);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -155,7 +158,7 @@ useEffect(() => {
 
     ws.onopen = () => {
       setStatusMsg('Connected');
-      ws.send(JSON.stringify({ type: 'set_model', model: coachModel }));
+      ws.send(JSON.stringify({ type: 'set_model', model: coachModelRef.current }));
     };
     ws.onerror = () => setStatusMsg('Connection error');
     ws.onclose = () => {

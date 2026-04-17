@@ -36,6 +36,7 @@ class CoachingEngine {
     this.wssEvents = null;
     this.running = false;
     this.history = [];
+    this._ticking = false;
   }
 
   setModel(model) {
@@ -64,6 +65,7 @@ class CoachingEngine {
 
   async _tick() {
     if (!this.running) return;
+    if (this._ticking) return; // prevent concurrent calls
     if (!this.transcript.hasNewSince(this.lastCoachAt)) return;
 
     const window = this.transcript.getWindow();
@@ -72,9 +74,11 @@ class CoachingEngine {
     const lines = window.split('\n').filter(Boolean);
     if (lines.length < 2) return;
 
+    this._ticking = true;
     this.lastCoachAt = Date.now();
 
     try {
+      console.log(`[Coach] Calling ${this.model}...`);
       const geminiModel = this.genai.getGenerativeModel({
         model: this.model,
         systemInstruction: SYSTEM_PROMPT,
@@ -85,29 +89,39 @@ class CoachingEngine {
       );
 
       const raw = result.response.text()?.trim();
-      if (!raw) return;
+      if (!raw) { console.warn('[Coach] Empty response'); return; }
 
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        console.error('[Coach] No JSON in response:', raw.slice(0, 100));
+        console.error('[Coach] No JSON in response:', raw.slice(0, 200));
         return;
       }
 
       const coaching = JSON.parse(jsonMatch[0]);
-      const payload = { ...coaching, timestamp: new Date().toISOString() };
+      const payload = { ...coaching, timestamp: new Date().toISOString(), model: this.model };
 
       this.history.unshift(payload);
       if (this.history.length > MAX_HISTORY) this.history.pop();
 
-      console.log('[Coach]', JSON.stringify(payload));
+      console.log(`[Coach] OK (${this.model}):`, JSON.stringify(payload));
       this._broadcast({ type: 'coaching', data: payload });
 
-      // Critical moment: bypass normal throttle, fire again in 3s
       if (payload.watch_out) {
         setTimeout(() => this._tick(), 3000);
       }
     } catch (err) {
-      console.error('[Coach] Error:', err.message);
+      const status = err?.status || err?.code;
+      if (status === 429) {
+        console.warn('[Coach] Rate limited (429) — retrying in 15s');
+        setTimeout(() => this._tick(), 15000);
+      } else if (status === 503 || status === 500) {
+        console.warn(`[Coach] Gemini ${status} — retrying in 5s`);
+        setTimeout(() => this._tick(), 5000);
+      } else {
+        console.error('[Coach] Error:', err.message || err);
+      }
+    } finally {
+      this._ticking = false;
     }
   }
 

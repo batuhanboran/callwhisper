@@ -80,10 +80,14 @@ wssEvents.on('connection', (ws) => {
     if (ws.readyState === 1) ws.ping();
   }, 30000);
 
+  const ALLOWED_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+
   ws.on('message', (data) => {
     try {
-      const msg = JSON.parse(data);
-      if (msg.type === 'set_model') coaching.setModel(msg.model);
+      const msg = JSON.parse(data.toString().slice(0, 512));
+      if (msg.type === 'set_model' && ALLOWED_MODELS.includes(msg.model)) {
+        coaching.setModel(msg.model);
+      }
     } catch (_) {}
   });
 

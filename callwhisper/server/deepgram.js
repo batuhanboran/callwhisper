@@ -74,8 +74,12 @@ class DeepgramManager {
     });
 
     this.connection.on(LiveTranscriptionEvents.Error, (err) => {
-      console.error(`[Deepgram] ${this.speaker} error:`, err.message || err);
+      console.error(`[Deepgram] ${this.speaker} error:`, err.message || JSON.stringify(err));
       this._broadcastStatus('error');
+    });
+
+    this.connection.on(LiveTranscriptionEvents.Warning, (warning) => {
+      console.warn(`[Deepgram] ${this.speaker} warning:`, warning?.warn_msg || JSON.stringify(warning));
     });
 
     this.connection.on(LiveTranscriptionEvents.Close, () => {
@@ -112,7 +116,12 @@ class DeepgramManager {
 
   send(audioChunk) {
     if (this.isConnected && this.connection) {
-      this.connection.send(audioChunk);
+      try {
+        this.connection.send(audioChunk);
+      } catch (err) {
+        console.error(`[Deepgram] ${this.speaker} send error:`, err.message);
+        this.isConnected = false;
+      }
     } else {
       if (this.pendingAudio.length < 20) this.pendingAudio.push(audioChunk);
     }
