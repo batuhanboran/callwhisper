@@ -1,4 +1,4 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const SYSTEM_PROMPT = `You are a real-time AI sales coaching assistant embedded in a live sales call.
 
@@ -23,17 +23,24 @@ Rules:
 - Prioritize watch_out — flags are most critical for the rep`;
 
 const MAX_HISTORY = 5;
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 class CoachingEngine {
   constructor(transcript) {
     this.transcript = transcript;
-    this.client = new Anthropic();
+    this.genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    this.model = DEFAULT_MODEL;
     this.intervalMs = parseInt(process.env.COACHING_INTERVAL_MS) || 8000;
     this.lastCoachAt = 0;
     this.timer = null;
     this.wssEvents = null;
     this.running = false;
     this.history = [];
+  }
+
+  setModel(model) {
+    this.model = model || DEFAULT_MODEL;
+    console.log(`[Coach] Model set to: ${this.model}`);
   }
 
   start(wssEvents) {
@@ -68,22 +75,16 @@ class CoachingEngine {
     this.lastCoachAt = Date.now();
 
     try {
-      const message = await this.client.messages.create(
-        {
-          model: 'claude-sonnet-4-6',
-          max_tokens: 400,
-          system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-          messages: [
-            {
-              role: 'user',
-              content: `Live sales call transcript (last ${process.env.TRANSCRIPT_WINDOW_S || 90}s):\n\n${window}\n\nProvide coaching now.`,
-            },
-          ],
-        },
-        { headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' } }
+      const geminiModel = this.genai.getGenerativeModel({
+        model: this.model,
+        systemInstruction: SYSTEM_PROMPT,
+      });
+
+      const result = await geminiModel.generateContent(
+        `Live sales call transcript (last ${process.env.TRANSCRIPT_WINDOW_S || 90}s):\n\n${window}\n\nProvide coaching now.`
       );
 
-      const raw = message.content[0]?.text?.trim();
+      const raw = result.response.text()?.trim();
       if (!raw) return;
 
       const jsonMatch = raw.match(/\{[\s\S]*\}/);

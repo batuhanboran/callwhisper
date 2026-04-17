@@ -80,6 +80,13 @@ wssEvents.on('connection', (ws) => {
     if (ws.readyState === 1) ws.ping();
   }, 30000);
 
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data);
+      if (msg.type === 'set_model') coaching.setModel(msg.model);
+    } catch (_) {}
+  });
+
   ws.on('close', () => {
     clearInterval(pingTimer);
     console.log('[Server] Events client disconnected');
