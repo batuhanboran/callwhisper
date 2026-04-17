@@ -8,6 +8,7 @@
     "dev": "node --watch server/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.21.0",
     "@deepgram/sdk": "^3.3.0",
     "cors": "^2.8.5",

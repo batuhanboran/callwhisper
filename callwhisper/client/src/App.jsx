@@ -40,7 +40,7 @@ const styles = {
   interim: { opacity: 0.4, fontStyle: 'italic' },
   timestamp: { color: '#555', fontSize: '11px', marginRight: '6px' },
   coachingEntry: { marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #222' },
-  coachingEntryOld: { opacity: 0.4 },
+  coachingEntryOld: { opacity: 0.6 },
   coachingBlock: { marginBottom: '8px', padding: '10px 12px', background: '#1a1a1a', borderRadius: '5px', borderLeft: '3px solid #555' },
   coachLabel: { fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '3px', color: '#888' },
   coachText: { fontSize: '13px', lineHeight: '1.4' },
@@ -86,9 +86,14 @@ export default function App() {
   const [talkStats, setTalkStats] = useState({ rep: { words: 0 }, prospect: { words: 0 } });
   const [devices, setDevices] = useState([]);
   const [micId, setMicId] = useState('');
-  const [sysId, setSysId] = useState('');
-  const [coachModel, setCoachModel] = useState('gemini-2.5-flash-preview-04-17');
-  const coachModelRef = useRef('gemini-2.5-flash-preview-04-17');
+  const [sysId, setSysId] = useState('__display__');
+  const [coachModel, setCoachModel] = useState('gemini-2.5-flash');
+  const coachModelRef = useRef('gemini-2.5-flash');
+  const [coachError, setCoachError] = useState(null);
+  const [repName, setRepName] = useState('Rep (You)');
+  const [prospectName, setProspectName] = useState('Prospect (Caller)');
+  const [deepgramKey, setDeepgramKey] = useState(() => localStorage.getItem('cw_dg_key') || '');
+  const [aiKey, setAiKey] = useState(() => localStorage.getItem('cw_ai_key') || '');
   const [statusMsg, setStatusMsg] = useState('Ready');
   const [sessionSecs, setSessionSecs] = useState(0);
   const [repStreamStatus, setRepStreamStatus] = useState('stopped');
@@ -154,12 +159,29 @@ useEffect(() => {
       } else if (msg.type === 'stream_status') {
         if (msg.speaker === 'Rep') setDeepgramRep(msg.status);
         else setDeepgramProspect(msg.status);
+      } else if (msg.type === 'coach_error') {
+        setCoachError(msg.message);
+        setTimeout(() => setCoachError(null), 8000);
+      } else if (msg.type === 'model_changed') {
+        setCoachModel(msg.model);
+        coachModelRef.current = msg.model;
       }
     };
 
     ws.onopen = () => {
       setStatusMsg('Connected');
       ws.send(JSON.stringify({ type: 'set_model', model: coachModelRef.current }));
+      const isClaude = coachModelRef.current.startsWith('claude');
+      if (deepgramKey || aiKey) {
+        ws.send(JSON.stringify({
+          type: 'set_config',
+          deepgramKey: deepgramKey || undefined,
+          geminiKey: !isClaude && aiKey ? aiKey : undefined,
+          anthropicKey: isClaude && aiKey ? aiKey : undefined,
+        }));
+        localStorage.setItem('cw_dg_key', deepgramKey);
+        localStorage.setItem('cw_ai_key', aiKey);
+      }
     };
     ws.onerror = () => setStatusMsg('Connection error');
     ws.onclose = () => {
@@ -208,6 +230,8 @@ useEffect(() => {
     setProspectLevel(0);
     setDeepgramRep('waiting');
     setDeepgramProspect('waiting');
+    setTranscript([]);
+    setCoachingHistory([]);
   };
 
   const totalWords = (talkStats.rep.words || 0) + (talkStats.prospect.words || 0);
@@ -225,6 +249,12 @@ useEffect(() => {
         {/* Audio stream handshake indicators */}
         <StreamIndicator label="Rep" status={repStreamStatus} level={repLevel} color="#4fc3f7" />
         <StreamIndicator label="Prospect" status={prospectStreamStatus} level={prospectLevel} color="#a5d6a7" />
+        {!running && (
+          <>
+            <input style={{ ...styles.select, width: '110px' }} value={repName} onChange={e => setRepName(e.target.value)} placeholder="Rep name" title="Mic input label" />
+            <input style={{ ...styles.select, width: '130px' }} value={prospectName} onChange={e => setProspectName(e.target.value)} placeholder="Prospect name" title="System audio label" />
+          </>
+        )}
 
         {/* Deepgram connection status */}
         {running && (
@@ -237,7 +267,7 @@ useEffect(() => {
 
         {totalWords > 0 && (
           <div style={styles.talkRatio}>
-            <span style={{ color: '#4fc3f7' }}>Rep {repPct}%</span>
+            <span style={{ color: '#4fc3f7' }}>{repName} {repPct}%</span>
             <div style={styles.ratioBar}>
               <div style={{ ...styles.ratioFill, width: `${repPct}%` }} />
             </div>
@@ -245,13 +275,48 @@ useEffect(() => {
           </div>
         )}
 
-        <select style={styles.select} value={coachModel} onChange={(e) => setCoachModel(e.target.value)} disabled={running}>
-          <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash Preview</option>
-          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-          <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
-          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-          <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
-          <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+        <input
+          style={{ ...styles.select, width: '140px', fontFamily: 'monospace' }}
+          type="password"
+          placeholder="Deepgram API Key"
+          value={deepgramKey}
+          onChange={e => setDeepgramKey(e.target.value)}
+          disabled={running}
+          title="Deepgram API Key"
+        />
+        <input
+          style={{ ...styles.select, width: '140px', fontFamily: 'monospace' }}
+          type="password"
+          placeholder="Gemini / Claude Key"
+          value={aiKey}
+          onChange={e => setAiKey(e.target.value)}
+          disabled={running}
+          title="Gemini API Key (for Gemini models) or Anthropic API Key (for Claude models)"
+        />
+        <select style={styles.select} value={coachModel} onChange={(e) => {
+          setCoachModel(e.target.value);
+          if (wsRef.current?.readyState === 1) {
+            wsRef.current.send(JSON.stringify({ type: 'set_model', model: e.target.value }));
+            const isClaude = e.target.value.startsWith('claude');
+            if (aiKey) wsRef.current.send(JSON.stringify({
+              type: 'set_config',
+              geminiKey: !isClaude ? aiKey : undefined,
+              anthropicKey: isClaude ? aiKey : undefined,
+            }));
+          }
+        }}>
+          <optgroup label="Gemini (free tier)">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+            <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest</option>
+          </optgroup>
+          <optgroup label="Claude (Anthropic key)">
+            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
+            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+            <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+          </optgroup>
         </select>
         <select style={styles.select} value={micId} onChange={(e) => setMicId(e.target.value)} disabled={running}>
           <option value="">— Rep mic —</option>
@@ -259,6 +324,7 @@ useEffect(() => {
         </select>
         <select style={styles.select} value={sysId} onChange={(e) => setSysId(e.target.value)} disabled={running}>
           <option value="">— Prospect / System audio —</option>
+          <option value="__display__">🖥 Share Tab / Screen Audio</option>
           {devices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || d.deviceId.slice(0, 20)}</option>)}
         </select>
         {!running
@@ -276,15 +342,18 @@ useEffect(() => {
           </div>
           <div style={styles.panelContent}>
             {transcript.length === 0 && <div style={styles.empty}>Transcript will appear here...</div>}
-            {transcript.map((entry, i) => (
-              <div key={i} style={{ ...styles.transcriptLine, ...(entry.is_final ? {} : styles.interim) }}>
-                <span style={styles.timestamp}>{fmt(entry.timestamp)}</span>
-                <span style={{ ...styles.speaker, ...(entry.speaker === 'Rep' ? styles.rep : styles.prospect) }}>
-                  [{entry.speaker}]
-                </span>
-                {entry.text}
-              </div>
-            ))}
+            {transcript.map((entry, i) => {
+              const isRep = entry.speaker === 'Rep';
+              return (
+                <div key={i} style={{ ...styles.transcriptLine, ...(entry.is_final ? {} : styles.interim), background: isRep ? 'rgba(79,195,247,0.05)' : 'rgba(165,214,167,0.05)', borderLeft: `2px solid ${isRep ? '#4fc3f7' : '#a5d6a7'}`, paddingLeft: '8px', borderRadius: '2px' }}>
+                  <span style={styles.timestamp}>{fmt(entry.timestamp)}</span>
+                  <span style={{ ...styles.speaker, ...(isRep ? styles.rep : styles.prospect) }}>
+                    [{isRep ? repName : prospectName}]
+                  </span>
+                  {entry.text}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -336,6 +405,11 @@ useEffect(() => {
           </div>
         </div>
       </div>
+      {coachError && (
+        <div style={{ position: 'fixed', bottom: '12px', left: '50%', transform: 'translateX(-50%)', background: '#b71c1c', color: '#fff', padding: '8px 18px', borderRadius: '5px', fontSize: '12px', zIndex: 999, boxShadow: '0 2px 8px #0008' }}>
+          ⚠ AI Coaching: {coachError}
+        </div>
+      )}
     </div>
   );
 }

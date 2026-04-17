@@ -9,14 +9,14 @@
 - [x] README.md with architecture decisions
 - [x] README.md with known limitations
 - [ ] 3–5 min demo video showing tool working on test call
-- [x] AI session logs (SESSION_LOG.md — Sessions 1 + 2 + 3 + 4 complete)
+- [x] AI session logs (SESSION_LOG.md — Sessions 1–7 complete)
 
 ### Minimum Pass Bar
-- [x] Two audio streams captured separately (mic = Rep, system audio = Prospect) — PASSED via BlackHole for both
+- [x] Two audio streams captured separately (mic = Rep, tab audio = Prospect) — PASSED via getDisplayMedia + getUserMedia
 - [x] Live transcript with correct Rep/Prospect labels — PASSED
 - [x] Transcript latency < 2s (partial transcripts) — PASSED (Deepgram Nova-2)
-- [ ] At least one coaching category (Say this / Ask this / Watch out) in real time — pending Gemini live test
-- [ ] Demo works on real OR simulated Zoom call — simulated (YouTube audio via BlackHole)
+- [x] At least one coaching category (Say this / Ask this / Watch out) in real time — PASSED (Gemini 2.5 Flash live)
+- [x] Demo works on real OR simulated call — PASSED (Windows Chrome + YouTube tab audio)
 
 ---
 

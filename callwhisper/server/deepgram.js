@@ -17,6 +17,11 @@ class DeepgramManager {
     this.keepAliveTimer = null;
   }
 
+  updateKey(key) {
+    this.client = createClient(key);
+    console.log(`[Deepgram] ${this.speaker} key updated`);
+  }
+
   connect() {
     if (this.isConnected) return;
     this.active = true;
@@ -28,7 +33,7 @@ class DeepgramManager {
 
     this.connection = this.client.listen.live({
       model: 'nova-2',
-      language: 'en-US',
+      language: process.env.TRANSCRIPT_LANGUAGE || 'en-US',
       smart_format: true,
       encoding: 'linear16',
       channels: 1,

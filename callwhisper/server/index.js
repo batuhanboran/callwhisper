@@ -16,9 +16,10 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 app.get('/health', (_, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
 const ALLOWED_MODELS = new Set([
-  'gemini-2.0-flash', 'gemini-2.0-flash-lite',
-  'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-pro',
-  'gemini-2.5-flash-preview-04-17',
+  'gemini-2.5-flash', 'gemini-2.5-flash-lite',
+  'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-flash-001',
+  'gemini-flash-latest', 'gemini-flash-lite-latest',
+  'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview',
 ]);
 
 const wssRep      = new WebSocketServer({ noServer: true });
@@ -88,9 +89,17 @@ wssEvents.on('connection', (ws) => {
 
   ws.on('message', (data) => {
     try {
-      const msg = JSON.parse(data.toString().slice(0, 512));
+      const msg = JSON.parse(data.toString().slice(0, 2048));
       if (msg.type === 'set_model' && ALLOWED_MODELS.has(msg.model)) {
         coaching.setModel(msg.model);
+      } else if (msg.type === 'set_config') {
+        if (msg.deepgramKey) {
+          deepgramRep.updateKey(msg.deepgramKey);
+          deepgramProspect.updateKey(msg.deepgramKey);
+        }
+        if (msg.geminiKey || msg.anthropicKey) {
+          coaching.updateKeys({ geminiKey: msg.geminiKey, anthropicKey: msg.anthropicKey });
+        }
       }
     } catch (_) {}
   });

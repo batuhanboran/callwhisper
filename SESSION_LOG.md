@@ -364,7 +364,86 @@ AI-assisted development log. Required deliverable per SOW Section 4:
 - SESSION_LOG.md: Session 5 + 6 logged
 
 ### Remaining
-- Verify Gemini coaching fires in live session
 - Add @serhatoptimum7 as GitHub collaborator
 - Record 3–5 min demo video
 - Submit
+
+---
+
+## Session 7 — 2026-04-17 (Audio Routing + Full Feature Polish)
+
+**Tool:** Claude Code (claude-sonnet-4-6) via CLI
+**Duration:** ~4h
+**Focus:** Windows audio routing, getDisplayMedia capture, model selector live, Claude support, UI polish, QA
+
+### Tasks Completed
+
+**1. Audio capture overhaul**
+- Replaced BlackHole-only approach with `getDisplayMedia` for Prospect stream
+- No virtual audio driver required — works natively on Windows and macOS
+- User picks Zoom/YouTube tab in Chrome share dialog, checks "Share tab audio"
+- Fallback: BlackHole/VB-Cable still available via device dropdown
+- Echo cancellation enabled on Rep mic (`echoCancellation: true`) to prevent speaker bleed
+
+**2. Windows audio routing (VB-Audio Cable)**
+- Installed VB-Cable on Windows host via SoundVolumeView CLI
+- Diagnosed CABLE Output not showing in Chrome → enabled via SoundVolumeView
+- Routed Chrome audio to CABLE Input for Prospect capture
+- Superseded by getDisplayMedia approach (no VB-Cable needed)
+
+**3. Gemini model fixes**
+- Fetched actual model list from Gemini API → confirmed valid IDs
+- Fixed `detect_language: true` (invalid for streaming) → reverted to `language: env || 'en-US'`
+- Added `FALLBACK_CHAIN`: 429 auto-switches `2.5-flash → 2.5-flash-lite → 2.0-flash → 2.0-flash-lite`
+- Backend broadcasts `model_changed` event → UI dropdown syncs automatically
+- Model selector enabled during live session (was disabled before)
+
+**4. Claude / Anthropic support**
+- Added `@anthropic-ai/sdk` to dependencies
+- `coach.js` detects model prefix (`claude` vs `gemini`) → routes to correct SDK
+- UI: separate optgroups "Gemini (free tier)" and "Claude (Anthropic key)"
+- Models: Claude Haiku 4.5, Claude 3.5 Haiku, Claude Sonnet 4.6
+
+**5. API key fields in UI**
+- Two password inputs in header: Deepgram key + Gemini/Claude key
+- Keys sent via `set_config` WebSocket message on session start
+- Saved to `localStorage` for convenience (not re-entered each visit)
+- Backend falls back to `.env` keys if UI fields empty
+- WS message cap raised to 2048 bytes to accommodate keys
+
+**6. UX improvements**
+- Stop session clears transcript + coaching history (fresh state per session)
+- Speaker names editable (default "Rep (You)" / "Prospect (Caller)")
+- Transcript lines: colored left-border + subtle tint per speaker
+- All-null coaching responses skipped (no phantom empty cards)
+- Old coaching entries: opacity 0.6 (was 0.4 — too dark)
+- Error banner (red, auto-dismiss 8s) for 429/500/503 + unknown errors
+- Model fallback shown in error banner with new model name
+
+**7. Bug fixes**
+| Bug | Fix |
+|-----|-----|
+| `detect_language: true` → Deepgram 400 | Reverted to `language` param |
+| getDisplayMedia video track not stopped | `displayStream.getVideoTracks().forEach(t => t.stop())` |
+| Rep mic picking up YouTube via speakers | `echoCancellation: true` on getUserMedia |
+| Prospect CABLE Output not in Chrome | Enabled via SoundVolumeView |
+| Model selector disabled during session | Removed `disabled={running}`, sends `set_model` live |
+
+### Key Decisions
+
+| Decision | Chosen | Reason |
+|----------|--------|--------|
+| Prospect capture | `getDisplayMedia` | No virtual audio driver, works Windows/macOS, user picks exact tab |
+| Multi-model | Gemini primary + Claude optional | Free tier for demo, Claude for production |
+| Keys in UI | Yes, with localStorage | Demo-friendly, no .env file required at demo time |
+| Clear on stop | Yes | Clean slate per session, avoids confusion in demo |
+
+### Files Modified
+- `client/src/capture.js` — getDisplayMedia for Prospect, echoCancellation on Rep
+- `client/src/App.jsx` — key fields, Claude models, clear on stop, model sync, editable names, error banner
+- `server/coach.js` — Claude SDK, fallback chain, auto model switch, dynamic key update
+- `server/deepgram.js` — `updateKey()` method
+- `server/index.js` — `set_config` handler, ALLOWED_MODELS updated, WS cap 2048
+- `package.json` — `@anthropic-ai/sdk` added
+- `README.md` — full rewrite reflecting new capture approach + features
+- `DELIVERY.md` — minimum bar items all checked

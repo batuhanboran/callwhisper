@@ -33,31 +33,23 @@ All planning, execution, and delivery files for the 48h trial task.
 
 ## Current Status
 
-- [x] Architecture decided: LXC 100 backend + VM 102 macOS
-- [x] All backend code written (server/, Dockerfile, docker-compose)
-- [x] Frontend code written (React UI, capture.js)
-- [x] Phase 0 test script written
-- [x] Push code to GitHub — https://github.com/batuhanboran/callwhisper (private)
-- [x] Deploy backend to LXC 100 Docker — `192.168.1.111:3003` ✓
-- [x] Cloudflare tunnel: callwhisper.batuhanboran.com → LXC 100:3003 ✓
-- [x] QA pass: stale closure fix, WS reconnect, Deepgram keepalive, unlimited retries
-- [x] Feature upgrades: objection_type, call_stage, prompt caching, talk ratio, coaching history
-- [x] UI upgrades: stream indicators, audio level bars, coaching badges, session timer
-- [x] README.md written + updated
-- [x] SESSION_LOG.md updated (Sessions 1 + 2 + 3 + 4)
-- [x] VM 102 (macOS Sonoma) — installed, macOS Sonoma 14.8.5 running, account macpc/1234
+- [x] Architecture: LXC 100 backend + VM 102 macOS + Windows Chrome demo
+- [x] Backend: server/, Dockerfile, docker-compose
+- [x] Frontend: React UI, capture.js (getDisplayMedia + getUserMedia)
+- [x] Deployed: callwhisper.batuhanboran.com (Cloudflare → LXC 100:3003) ✓
+- [x] Transcription: Rep/Prospect labels live, < 2s latency ✓
+- [x] AI coaching: Gemini 2.5 Flash live ✓ + Claude support added
+- [x] Rate limit handling: 429 auto-fallback chain (4 Gemini models)
+- [x] Model selector: live during session, 8 models (Gemini + Claude)
+- [x] API keys: entered in UI, saved to localStorage, override .env
+- [x] Audio capture: getDisplayMedia (no virtual driver needed) + BlackHole fallback
+- [x] Echo cancellation on Rep mic (prevents speaker bleed)
+- [x] Stop clears transcript + coaching (clean per-session state)
+- [x] Error banner: shows 429/fallback/error details in red banner
+- [x] Editable speaker names (Rep / Prospect labels)
+- [x] Security: no hardcoded secrets, .env gitignored, WS input validated
+- [x] SESSION_LOG.md: Sessions 1–7 complete
+- [x] README.md updated (getDisplayMedia, Claude, key fields, current architecture)
 - [ ] Add @serhatoptimum7 as GitHub collaborator (GitHub Settings → Collaborators)
-- [x] Phase 0 audio test on macOS VM — PASSED (two streams, BlackHole detected)
-- [x] Chrome + Zoom installed on macOS VM
-- [x] SSH key auth configured (macpc@192.168.1.110, no password)
-- [x] End-to-end transcription test PASSED — [Rep]/[Prospect] labels live in UI
-- [x] Switched coaching engine: Anthropic → Gemini 2.0 Flash (free tier)
-- [x] Model selector added to UI (4 Gemini models)
-- [x] Full QA pass — 8 bugs fixed (concurrent ticks, stale closure, 429 retry, send crash, WS race, level leak, double-start, model allowlist)
-- [x] Transcript newest-on-top, max 100 lines
-- [x] Security review — no hardcoded secrets, .env gitignored
-- [x] All docs + README updated (Gemini, Session 6)
-- [ ] Gemini coaching verified live (needs active session test)
-- [ ] Add @serhatoptimum7 as GitHub collaborator
 - [ ] Demo video recording (3–5 min)
 - [ ] Submit

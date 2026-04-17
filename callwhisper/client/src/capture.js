@@ -97,10 +97,34 @@ export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}) 
     video: false,
   });
 
-  const [micStream, sysStream] = await Promise.all([
-    navigator.mediaDevices.getUserMedia(constraints(micDeviceId)),
-    navigator.mediaDevices.getUserMedia(constraints(systemDeviceId)),
-  ]);
+  let micStream, sysStream;
+
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      deviceId: { exact: micDeviceId },
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: SAMPLE_RATE,
+      channelCount: 1,
+    },
+    video: false,
+  });
+
+  if (systemDeviceId === '__display__') {
+    // Use tab/screen audio capture — no VB-Cable needed
+    const displayStream = await navigator.mediaDevices.getDisplayMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      video: { width: 1, height: 1 },
+    });
+    const audioTracks = displayStream.getAudioTracks();
+    if (!audioTracks.length) throw new Error('No audio track from screen share — make sure to check "Share tab audio"');
+    // Stop video track immediately (we only need audio)
+    displayStream.getVideoTracks().forEach(t => t.stop());
+    sysStream = new MediaStream(audioTracks);
+  } else {
+    sysStream = await navigator.mediaDevices.getUserMedia(constraints(systemDeviceId));
+  }
 
   const [repSender, prospectSender] = await Promise.all([
     createAudioSender(micStream, '/audio-rep', {
