@@ -87,8 +87,8 @@ export default function App() {
   const [devices, setDevices] = useState([]);
   const [micId, setMicId] = useState('');
   const [sysId, setSysId] = useState('');
-  const [coachModel, setCoachModel] = useState('gemini-2.0-flash');
-  const coachModelRef = useRef('gemini-2.0-flash');
+  const [coachModel, setCoachModel] = useState('gemini-2.5-flash-preview-04-17');
+  const coachModelRef = useRef('gemini-2.5-flash-preview-04-17');
   const [statusMsg, setStatusMsg] = useState('Ready');
   const [sessionSecs, setSessionSecs] = useState(0);
   const [repStreamStatus, setRepStreamStatus] = useState('stopped');
@@ -246,9 +246,11 @@ useEffect(() => {
         )}
 
         <select style={styles.select} value={coachModel} onChange={(e) => setCoachModel(e.target.value)} disabled={running}>
+          <option value="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash Preview</option>
           <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
           <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
           <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+          <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
           <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
         </select>
         <select style={styles.select} value={micId} onChange={(e) => setMicId(e.target.value)} disabled={running}>

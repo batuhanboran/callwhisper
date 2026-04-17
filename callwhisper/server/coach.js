@@ -23,7 +23,7 @@ Rules:
 - Prioritize watch_out — flags are most critical for the rep`;
 
 const MAX_HISTORY = 5;
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash-preview-04-17';
 
 class CoachingEngine {
   constructor(transcript) {
