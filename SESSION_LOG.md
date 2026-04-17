@@ -293,7 +293,78 @@ AI-assisted development log. Required deliverable per SOW Section 4:
 | noVNC audio | Not supported — browser VNC has no audio channel |
 
 ### Remaining
-- End-to-end Zoom test (open callwhisper.batuhanboran.com in Chrome on VM, join Zoom)
+- Gemini coaching verified live (active session test)
 - Demo video recording
 - Add @serhatoptimum7 as GitHub collaborator
+- Submit
+
+---
+
+## Session 6 — 2026-04-17 (E2E Test + Gemini Switch + QA)
+
+**Tool:** Claude Code (claude-sonnet-4-6) via CLI  
+**Duration:** ~2h  
+**Mode:** Caveman Ultra + Context-mode
+
+### What Claude Code Did
+
+**1. End-to-end transcription test — PASSED**
+- Diagnosed: Rep stream silent (VM mic = virtual, `driver=none` = no input)
+- Solution: macOS system output → BlackHole (via `SwitchAudioSource` SSH), both Rep + Prospect = BlackHole
+- Played YouTube sales call video → both streams transcribed live ✓
+- Fallback 2 from PLAN.md — proves full pipeline end-to-end
+
+**2. Diagnosed Anthropic API failure**
+- `[Coach] Error: 400 credit balance too low` — Anthropic account has $0
+- Switched coaching engine to **Gemini 2.0 Flash** (free tier, 15 RPM, 1M TPM)
+- User's key: Google AI Studio (gemini API key)
+
+**3. Coaching engine migration**
+- Replaced `@anthropic-ai/sdk` with `@google/generative-ai` in `package.json`
+- Rewrote `coach.js` — `GoogleGenerativeAI`, `systemInstruction`, same output schema
+- Added `setModel(model)` method
+- `.env.example`: `ANTHROPIC_API_KEY` → `GEMINI_API_KEY`
+
+**4. Model selector UI**
+- `App.jsx`: dropdown with 4 Gemini models (default: `gemini-2.0-flash`)
+- `coachModelRef` (useRef) synced via `useEffect` — fixes stale closure bug
+- Events WS `onopen` sends `{type: 'set_model', model}` immediately
+- Backend `index.js` handles `set_model` message, validates against `ALLOWED_MODELS` Set
+
+**5. Transcript UX improvements**
+- Newest transcript lines appear at TOP (no scrolling)
+- Max 100 lines in state (memory bound)
+- Removed auto-scroll ref
+
+**6. Full QA pass — 8 bugs found and fixed**
+
+| Bug | File | Fix |
+|-----|------|-----|
+| Stale `coachModel` closure | `App.jsx` | `coachModelRef` synced via `useEffect` |
+| Concurrent coach ticks | `coach.js` | `_ticking` flag + `finally` reset |
+| No Gemini 429/503 retry | `coach.js` | Auto-retry 15s/5s respectively |
+| `send()` can throw | `deepgram.js` | try/catch, resets `isConnected` |
+| No Deepgram Warning log | `deepgram.js` | `LiveTranscriptionEvents.Warning` handler |
+| Double-click start | `App.jsx` | `if (running) return` guard |
+| WS reconnect race | `App.jsx` | Close existing WS before opening new |
+| Level interval leak | `capture.js` | Clear `levelInterval` on WS close when stopped |
+| `ALLOWED_MODELS` per-connection | `index.js` | Moved to module-level `Set` |
+
+**7. Security review**
+- No hardcoded secrets in any file ✓
+- `.env` in `.gitignore` ✓
+- No sensitive filenames committed ✓
+- `ALLOWED_MODELS` whitelist prevents arbitrary model injection ✓
+- WS message capped at 512 bytes ✓
+- CORS open (`*`) — acceptable for demo ✓
+
+**8. Documentation pass**
+- README: all Anthropic/Claude refs → Gemini
+- INDEX.md: updated all completed checkboxes
+- SESSION_LOG.md: Session 5 + 6 logged
+
+### Remaining
+- Verify Gemini coaching fires in live session
+- Add @serhatoptimum7 as GitHub collaborator
+- Record 3–5 min demo video
 - Submit

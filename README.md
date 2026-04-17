@@ -26,7 +26,7 @@ macOS (Chrome browser)
 **Why this stack:**
 - BlackHole: free virtual audio driver, routes Zoom output to Chrome input
 - Deepgram Nova-2: streaming API, partial transcripts under 2s
-- Gemini 2.0 Flash: structured JSON output, required by project spec
+- Gemini 2.0 Flash: structured JSON output, free tier (15 RPM), model selector in UI
 - Browser + Node: no Electron compile step, fast iteration
 
 ## Prerequisites
@@ -113,7 +113,7 @@ callwhisper/
 │   ├── index.js        Express + WS server, serves static frontend
 │   ├── deepgram.js     Dual Deepgram Nova-2 streaming connections
 │   ├── transcript.js   Rolling 90s buffer, Rep/Prospect labels
-│   └── coach.js        Claude Sonnet, 8s throttle, structured output
+│   └── coach.js        Gemini 2.0 Flash, 8s throttle, model selector, structured output
 ├── client/
 │   └── src/
 │       ├── App.jsx     UI: transcript panel + coaching panel

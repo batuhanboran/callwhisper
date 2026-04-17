@@ -12,11 +12,11 @@
 - [x] AI session logs (SESSION_LOG.md — Sessions 1 + 2 + 3 + 4 complete)
 
 ### Minimum Pass Bar
-- [ ] Two audio streams captured separately (mic = Rep, system audio = Prospect)
-- [ ] Live transcript with correct Rep/Prospect labels
-- [ ] Transcript latency < 2s (partial transcripts)
-- [ ] At least one coaching category (Say this / Ask this / Watch out) in real time
-- [ ] Demo works on real OR simulated Zoom call
+- [x] Two audio streams captured separately (mic = Rep, system audio = Prospect) — PASSED via BlackHole for both
+- [x] Live transcript with correct Rep/Prospect labels — PASSED
+- [x] Transcript latency < 2s (partial transcripts) — PASSED (Deepgram Nova-2)
+- [ ] At least one coaching category (Say this / Ask this / Watch out) in real time — pending Gemini live test
+- [ ] Demo works on real OR simulated Zoom call — simulated (YouTube audio via BlackHole)
 
 ---
 

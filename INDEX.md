@@ -50,6 +50,14 @@ All planning, execution, and delivery files for the 48h trial task.
 - [x] Phase 0 audio test on macOS VM — PASSED (two streams, BlackHole detected)
 - [x] Chrome + Zoom installed on macOS VM
 - [x] SSH key auth configured (macpc@192.168.1.110, no password)
-- [ ] End-to-end Zoom test
-- [ ] Demo video recording
+- [x] End-to-end transcription test PASSED — [Rep]/[Prospect] labels live in UI
+- [x] Switched coaching engine: Anthropic → Gemini 2.0 Flash (free tier)
+- [x] Model selector added to UI (4 Gemini models)
+- [x] Full QA pass — 8 bugs fixed (concurrent ticks, stale closure, 429 retry, send crash, WS race, level leak, double-start, model allowlist)
+- [x] Transcript newest-on-top, max 100 lines
+- [x] Security review — no hardcoded secrets, .env gitignored
+- [x] All docs + README updated (Gemini, Session 6)
+- [ ] Gemini coaching verified live (needs active session test)
+- [ ] Add @serhatoptimum7 as GitHub collaborator
+- [ ] Demo video recording (3–5 min)
 - [ ] Submit
