@@ -15,6 +15,8 @@ const server = http.createServer(app);
 app.use(express.static(path.join(__dirname, '../client/dist')));
 app.get('/health', (_, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
+const ALLOWED_MODELS = new Set(['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro']);
+
 const wssRep      = new WebSocketServer({ noServer: true });
 const wssProspect = new WebSocketServer({ noServer: true });
 const wssEvents   = new WebSocketServer({ noServer: true });
@@ -80,12 +82,10 @@ wssEvents.on('connection', (ws) => {
     if (ws.readyState === 1) ws.ping();
   }, 30000);
 
-  const ALLOWED_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-
   ws.on('message', (data) => {
     try {
       const msg = JSON.parse(data.toString().slice(0, 512));
-      if (msg.type === 'set_model' && ALLOWED_MODELS.includes(msg.model)) {
+      if (msg.type === 'set_model' && ALLOWED_MODELS.has(msg.model)) {
         coaching.setModel(msg.model);
       }
     } catch (_) {}

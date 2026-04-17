@@ -48,12 +48,14 @@ async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
 
     ws.onclose = () => {
       console.log(`[Capture] WS closed: ${wsPath}`);
-      if (!stopped) {
-        const delay = Math.min(RECONNECT_MAX_DELAY, 500 * Math.pow(2, reconnectAttempts));
-        reconnectAttempts++;
-        onStatus?.('reconnecting');
-        reconnectTimer = setTimeout(connect, delay);
+      if (stopped) {
+        clearInterval(levelInterval);
+        return;
       }
+      const delay = Math.min(RECONNECT_MAX_DELAY, 500 * Math.pow(2, reconnectAttempts));
+      reconnectAttempts++;
+      onStatus?.('reconnecting');
+      reconnectTimer = setTimeout(connect, delay);
     };
   }
 
