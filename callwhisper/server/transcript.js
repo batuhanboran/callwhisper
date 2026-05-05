@@ -23,6 +23,11 @@ class TranscriptManager {
     return this.entries.filter((e) => e.is_final);
   }
 
+  clear() {
+    this.entries = [];
+    this.lastAddedAt = 0;
+  }
+
   hasNewSince(tsMs) {
     return this.lastAddedAt > tsMs;
   }

@@ -71,6 +71,11 @@ class CoachingEngine {
 
   getHistory() { return this.history; }
 
+  resetHistory() {
+    this.history = [];
+    this.lastCoachAt = 0;
+  }
+
   _isClaude() { return this.model.startsWith('claude'); }
 
   async _callClaude(prompt) {

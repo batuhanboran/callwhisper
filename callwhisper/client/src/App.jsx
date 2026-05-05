@@ -3,6 +3,12 @@ import { startCapture, listAudioInputs } from './capture';
 
 const BACKEND_WS = import.meta.env.VITE_BACKEND_WS || '';
 
+function getWsUrl(path) {
+  if (BACKEND_WS) return `${BACKEND_WS}${path}`;
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}${path}`;
+}
+
 const OBJECTION_COLORS = {
   price: '#ef9a9a', timing: '#ffcc80', authority: '#ce93d8',
   competitor: '#80cbc4', feature: '#90caf9',
@@ -94,6 +100,8 @@ export default function App() {
   const [prospectName, setProspectName] = useState('Prospect (Caller)');
   const [deepgramKey, setDeepgramKey] = useState(() => localStorage.getItem('cw_dg_key') || '');
   const [aiKey, setAiKey] = useState(() => localStorage.getItem('cw_ai_key') || '');
+  const deepgramKeyRef = useRef(deepgramKey);
+  const aiKeyRef = useRef(aiKey);
   const [statusMsg, setStatusMsg] = useState('Ready');
   const [sessionSecs, setSessionSecs] = useState(0);
   const [repStreamStatus, setRepStreamStatus] = useState('stopped');
@@ -106,10 +114,12 @@ export default function App() {
   const wsRef = useRef(null);
 
   useEffect(() => { coachModelRef.current = coachModel; }, [coachModel]);
+  useEffect(() => { deepgramKeyRef.current = deepgramKey; }, [deepgramKey]);
+  useEffect(() => { aiKeyRef.current = aiKey; }, [aiKey]);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    listAudioInputs()
+    listAudioInputs({ requestPermission: false })
       .then((devs) => {
         setDevices(devs);
         if (devs.length > 0) setMicId(devs[0].deviceId);
@@ -117,7 +127,7 @@ export default function App() {
         if (bh) setSysId(bh.deviceId);
         else if (devs.length > 1) setSysId(devs[1].deviceId);
       })
-      .catch((e) => setStatusMsg('Mic permission denied: ' + e.message));
+      .catch((e) => setStatusMsg('Audio devices unavailable: ' + e.message));
   }, []);
 
 useEffect(() => {
@@ -130,9 +140,9 @@ useEffect(() => {
     return () => clearInterval(timerRef.current);
   }, [running]);
 
-  const connectEvents = useCallback(() => {
+  const connectEvents = useCallback(({ resetSession = false } = {}) => {
     if (wsRef.current && wsRef.current.readyState < 2) wsRef.current.close();
-    const wsUrl = BACKEND_WS ? `${BACKEND_WS}/events` : `/events`;
+    const wsUrl = getWsUrl(resetSession ? '/events?reset=1' : '/events');
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -154,6 +164,10 @@ useEffect(() => {
         setCoachingHistory((prev) => [msg.data, ...prev].slice(0, 5));
       } else if (msg.type === 'coaching_history') {
         setCoachingHistory(msg.data);
+      } else if (msg.type === 'session_reset') {
+        setTranscript([]);
+        setCoachingHistory([]);
+        setTalkStats({ rep: { words: 0 }, prospect: { words: 0 } });
       } else if (msg.type === 'stats') {
         setTalkStats(msg.data);
       } else if (msg.type === 'stream_status') {
@@ -172,19 +186,24 @@ useEffect(() => {
       setStatusMsg('Connected');
       ws.send(JSON.stringify({ type: 'set_model', model: coachModelRef.current }));
       const isClaude = coachModelRef.current.startsWith('claude');
-      if (deepgramKey || aiKey) {
+      const currentDeepgramKey = deepgramKeyRef.current;
+      const currentAiKey = aiKeyRef.current;
+      if (currentDeepgramKey || currentAiKey) {
         ws.send(JSON.stringify({
           type: 'set_config',
-          deepgramKey: deepgramKey || undefined,
-          geminiKey: !isClaude && aiKey ? aiKey : undefined,
-          anthropicKey: isClaude && aiKey ? aiKey : undefined,
+          deepgramKey: currentDeepgramKey || undefined,
+          geminiKey: !isClaude && currentAiKey ? currentAiKey : undefined,
+          anthropicKey: isClaude && currentAiKey ? currentAiKey : undefined,
         }));
-        localStorage.setItem('cw_dg_key', deepgramKey);
-        localStorage.setItem('cw_ai_key', aiKey);
+        localStorage.setItem('cw_dg_key', currentDeepgramKey);
+        localStorage.setItem('cw_ai_key', currentAiKey);
       }
     };
-    ws.onerror = () => setStatusMsg('Connection error');
+    ws.onerror = () => {
+      if (runningRef.current) setStatusMsg('Connection error');
+    };
     ws.onclose = () => {
+      if (!runningRef.current) return;
       setStatusMsg('Disconnected');
       // Use ref — avoids stale closure capturing old running value
       if (runningRef.current) setTimeout(connectEvents, 2000);
@@ -193,16 +212,22 @@ useEffect(() => {
 
   const handleStart = async () => {
     if (running) return;
-    if (!micId || !sysId) {
-      setStatusMsg('Select both mic and system audio devices');
+    if (!sysId) {
+      setStatusMsg('Select prospect / system audio');
       return;
     }
+    let selectedMicId = micId;
     try {
       setStatusMsg('Starting...');
+      if (!selectedMicId) {
+        const devs = await listAudioInputs({ requestPermission: true });
+        setDevices(devs);
+        selectedMicId = devs[0]?.deviceId || '';
+        if (selectedMicId) setMicId(selectedMicId);
+      }
       setDeepgramRep('connecting');
       setDeepgramProspect('connecting');
-      connectEvents();
-      const cap = await startCapture(micId, sysId, {
+      const cap = await startCapture(selectedMicId, sysId, {
         onRepStatus:      setRepStreamStatus,
         onRepLevel:       setRepLevel,
         onProspectStatus: setProspectStreamStatus,
@@ -211,17 +236,30 @@ useEffect(() => {
       setSession(cap);
       runningRef.current = true;
       setRunning(true);
+      connectEvents({ resetSession: true });
       setStatusMsg('Live');
     } catch (e) {
+      runningRef.current = false;
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setSession(null);
+      setRunning(false);
+      setRepStreamStatus('stopped');
+      setProspectStreamStatus('stopped');
+      setDeepgramRep('waiting');
+      setDeepgramProspect('waiting');
       setStatusMsg('Failed: ' + e.message);
     }
   };
 
   const handleStop = () => {
+    runningRef.current = false;
     if (session) session.stop();
     if (wsRef.current) wsRef.current.close();
+    wsRef.current = null;
     setSession(null);
-    runningRef.current = false;
     setRunning(false);
     setStatusMsg('Stopped');
     setRepStreamStatus('stopped');

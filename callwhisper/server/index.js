@@ -20,6 +20,8 @@ const ALLOWED_MODELS = new Set([
   'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-flash-001',
   'gemini-flash-latest', 'gemini-flash-lite-latest',
   'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview',
+  'claude-haiku-4-5-20251001', 'claude-3-5-haiku-20241022',
+  'claude-sonnet-4-6',
 ]);
 
 const wssRep      = new WebSocketServer({ noServer: true });
@@ -39,7 +41,7 @@ server.on('upgrade', (request, socket, head) => {
   } else if (pathname === '/audio-prospect') {
     wssProspect.handleUpgrade(request, socket, head, (ws) => wssProspect.emit('connection', ws));
   } else if (pathname === '/events') {
-    wssEvents.handleUpgrade(request, socket, head, (ws) => wssEvents.emit('connection', ws));
+    wssEvents.handleUpgrade(request, socket, head, (ws) => wssEvents.emit('connection', ws, request));
   } else {
     socket.destroy();
   }
@@ -67,8 +69,16 @@ wssProspect.on('connection', (ws) => {
   ws.on('error', (err) => console.error('[Server] Prospect WS error:', err.message));
 });
 
-wssEvents.on('connection', (ws) => {
+wssEvents.on('connection', (ws, request) => {
   console.log('[Server] Events client connected');
+  const { searchParams } = new URL(request.url, `http://${request.headers.host}`);
+
+  if (searchParams.get('reset') === '1') {
+    transcript.clear();
+    coaching.resetHistory();
+    ws.send(JSON.stringify({ type: 'session_reset' }));
+    console.log('[Server] Session state reset');
+  }
 
   const txHistory = transcript.getAll();
   if (txHistory.length) {

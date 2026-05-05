@@ -2,6 +2,12 @@ const BACKEND_WS = import.meta.env.VITE_BACKEND_WS || '';
 const SAMPLE_RATE = 16000;
 const RECONNECT_MAX_DELAY = 10000;
 
+function getWsUrl(path) {
+  if (BACKEND_WS) return `${BACKEND_WS}${path}`;
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}${path}`;
+}
+
 function float32ToInt16(float32Array) {
   const int16 = new Int16Array(float32Array.length);
   for (let i = 0; i < float32Array.length; i++) {
@@ -12,7 +18,7 @@ function float32ToInt16(float32Array) {
 }
 
 async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
-  const wsUrl = BACKEND_WS ? `${BACKEND_WS}${wsPath}` : wsPath;
+  const wsUrl = getWsUrl(wsPath);
   let ws = null;
   let stopped = false;
   let reconnectAttempts = 0;
@@ -21,8 +27,9 @@ async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
   const audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
   const source = audioCtx.createMediaStreamSource(stream);
   const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+  const silentOutput = audioCtx.createGain();
+  silentOutput.gain.value = 0;
 
-  // Level monitoring
   const analyser = audioCtx.createAnalyser();
   analyser.fftSize = 256;
   source.connect(analyser);
@@ -67,7 +74,8 @@ async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
   };
 
   source.connect(processor);
-  processor.connect(audioCtx.destination);
+  processor.connect(silentOutput);
+  silentOutput.connect(audioCtx.destination);
 
   return {
     stop() {
@@ -75,6 +83,7 @@ async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
       clearTimeout(reconnectTimer);
       clearInterval(levelInterval);
       processor.disconnect();
+      silentOutput.disconnect();
       source.disconnect();
       analyser.disconnect();
       audioCtx.close();
@@ -87,7 +96,7 @@ async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
 export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}) {
   const constraints = (deviceId) => ({
     audio: {
-      deviceId: { exact: deviceId },
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
@@ -98,44 +107,52 @@ export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}) 
   });
 
   let micStream, sysStream;
+  let repSender, prospectSender;
 
-  micStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      deviceId: { exact: micDeviceId },
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      sampleRate: SAMPLE_RATE,
-      channelCount: 1,
-    },
-    video: false,
-  });
-
-  if (systemDeviceId === '__display__') {
-    // Use tab/screen audio capture — no VB-Cable needed
-    const displayStream = await navigator.mediaDevices.getDisplayMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      video: { width: 1, height: 1 },
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        ...(micDeviceId ? { deviceId: { exact: micDeviceId } } : {}),
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: SAMPLE_RATE,
+        channelCount: 1,
+      },
+      video: false,
     });
-    const audioTracks = displayStream.getAudioTracks();
-    if (!audioTracks.length) throw new Error('No audio track from screen share — make sure to check "Share tab audio"');
-    // Stop video track immediately (we only need audio)
-    displayStream.getVideoTracks().forEach(t => t.stop());
-    sysStream = new MediaStream(audioTracks);
-  } else {
-    sysStream = await navigator.mediaDevices.getUserMedia(constraints(systemDeviceId));
-  }
 
-  const [repSender, prospectSender] = await Promise.all([
-    createAudioSender(micStream, '/audio-rep', {
-      onStatus: (s) => callbacks.onRepStatus?.(s),
-      onLevel:  (v) => callbacks.onRepLevel?.(v),
-    }),
-    createAudioSender(sysStream, '/audio-prospect', {
-      onStatus: (s) => callbacks.onProspectStatus?.(s),
-      onLevel:  (v) => callbacks.onProspectLevel?.(v),
-    }),
-  ]);
+    if (systemDeviceId === '__display__') {
+      // Use tab/screen audio capture; no virtual audio driver needed.
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        video: { width: 1, height: 1 },
+      });
+      const audioTracks = displayStream.getAudioTracks();
+      if (!audioTracks.length) throw new Error('No audio track from screen share; make sure to check "Share tab audio"');
+      displayStream.getVideoTracks().forEach(t => t.stop());
+      sysStream = new MediaStream(audioTracks);
+    } else {
+      sysStream = await navigator.mediaDevices.getUserMedia(constraints(systemDeviceId));
+    }
+
+    [repSender, prospectSender] = await Promise.all([
+      createAudioSender(micStream, '/audio-rep', {
+        onStatus: (s) => callbacks.onRepStatus?.(s),
+        onLevel:  (v) => callbacks.onRepLevel?.(v),
+      }),
+      createAudioSender(sysStream, '/audio-prospect', {
+        onStatus: (s) => callbacks.onProspectStatus?.(s),
+        onLevel:  (v) => callbacks.onProspectLevel?.(v),
+      }),
+    ]);
+  } catch (err) {
+    repSender?.stop();
+    prospectSender?.stop();
+    micStream?.getTracks().forEach((t) => t.stop());
+    sysStream?.getTracks().forEach((t) => t.stop());
+    throw err;
+  }
 
   return {
     stop() {
@@ -147,8 +164,12 @@ export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}) 
   };
 }
 
-export async function listAudioInputs() {
-  await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+export async function listAudioInputs({ requestPermission = false } = {}) {
+  let permissionStream = null;
+  if (requestPermission) {
+    permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  }
   const devices = await navigator.mediaDevices.enumerateDevices();
+  permissionStream?.getTracks().forEach((track) => track.stop());
   return devices.filter((d) => d.kind === 'audioinput');
 }

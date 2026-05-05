@@ -8,27 +8,42 @@ class DeepgramManager {
     this.speaker = speaker;
     this.transcript = transcript;
     this.wssEvents = wssEvents;
-    this.client = createClient(process.env.DEEPGRAM_API_KEY);
+    this.apiKey = process.env.DEEPGRAM_API_KEY || '';
+    this.client = this.apiKey ? createClient(this.apiKey) : null;
     this.connection = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
     this.pendingAudio = [];
     this.active = false;
     this.keepAliveTimer = null;
+    this.reconnectTimer = null;
   }
 
   updateKey(key) {
+    if (!key) return;
+    this.apiKey = key;
     this.client = createClient(key);
     console.log(`[Deepgram] ${this.speaker} key updated`);
+    if (this.active && !this.isConnected) this._open();
   }
 
   connect() {
     if (this.isConnected) return;
     this.active = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this._open();
   }
 
   _open() {
+    if (!this.active) return;
+    if (!this.client) {
+      console.warn(`[Deepgram] ${this.speaker} stream waiting for API key`);
+      this._broadcastStatus('waiting_for_key');
+      return;
+    }
     console.log(`[Deepgram] Opening ${this.speaker} stream (attempt ${this.reconnectAttempts + 1})...`);
 
     this.connection = this.client.listen.live({
@@ -98,7 +113,10 @@ class DeepgramManager {
         this.reconnectAttempts++;
         console.log(`[Deepgram] ${this.speaker} reconnect in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
         this._broadcastStatus('reconnecting');
-        setTimeout(() => this._open(), delay);
+        this.reconnectTimer = setTimeout(() => {
+          this.reconnectTimer = null;
+          if (this.active) this._open();
+        }, delay);
       }
     });
   }
@@ -136,6 +154,10 @@ class DeepgramManager {
     this.active = false;
     this.isConnected = false;
     this._stopKeepalive();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.connection) {
       try { this.connection.finish(); } catch (_) {}
       this.connection = null;
