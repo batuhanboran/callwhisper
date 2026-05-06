@@ -24,6 +24,29 @@ const ALLOWED_MODELS = new Set([
   'claude-sonnet-4-6',
 ]);
 
+const ALLOWED_TRANSCRIPT_LANGUAGES = new Set(['multi', 'en-US', 'tr']);
+
+function getDefaultTranscriptLanguage() {
+  return ALLOWED_TRANSCRIPT_LANGUAGES.has(process.env.TRANSCRIPT_LANGUAGE)
+    ? process.env.TRANSCRIPT_LANGUAGE
+    : 'multi';
+}
+
+function getTranscriptConfig(request) {
+  const { searchParams } = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+  const requestedLanguage = searchParams.get('language');
+
+  if (requestedLanguage && !ALLOWED_TRANSCRIPT_LANGUAGES.has(requestedLanguage)) {
+    console.warn(`[Server] Ignoring unsupported transcript language: ${requestedLanguage}`);
+  }
+
+  return {
+    language: ALLOWED_TRANSCRIPT_LANGUAGES.has(requestedLanguage)
+      ? requestedLanguage
+      : getDefaultTranscriptLanguage(),
+  };
+}
+
 const wssRep      = new WebSocketServer({ noServer: true });
 const wssProspect = new WebSocketServer({ noServer: true });
 const wssEvents   = new WebSocketServer({ noServer: true });
@@ -37,9 +60,9 @@ const deepgramProspect = new DeepgramManager('Prospect', transcript, wssEvents);
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, `http://${request.headers.host}`);
   if (pathname === '/audio-rep') {
-    wssRep.handleUpgrade(request, socket, head, (ws) => wssRep.emit('connection', ws));
+    wssRep.handleUpgrade(request, socket, head, (ws) => wssRep.emit('connection', ws, request));
   } else if (pathname === '/audio-prospect') {
-    wssProspect.handleUpgrade(request, socket, head, (ws) => wssProspect.emit('connection', ws));
+    wssProspect.handleUpgrade(request, socket, head, (ws) => wssProspect.emit('connection', ws, request));
   } else if (pathname === '/events') {
     wssEvents.handleUpgrade(request, socket, head, (ws) => wssEvents.emit('connection', ws, request));
   } else {
@@ -47,9 +70,10 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-wssRep.on('connection', (ws) => {
-  console.log('[Server] Rep connected');
-  deepgramRep.connect();
+wssRep.on('connection', (ws, request) => {
+  const transcriptConfig = getTranscriptConfig(request);
+  console.log(`[Server] Rep connected (${transcriptConfig.language})`);
+  deepgramRep.connect(transcriptConfig);
   ws.on('message', (data) => deepgramRep.send(data));
   ws.on('close', () => {
     console.log('[Server] Rep disconnected');
@@ -58,9 +82,10 @@ wssRep.on('connection', (ws) => {
   ws.on('error', (err) => console.error('[Server] Rep WS error:', err.message));
 });
 
-wssProspect.on('connection', (ws) => {
-  console.log('[Server] Prospect connected');
-  deepgramProspect.connect();
+wssProspect.on('connection', (ws, request) => {
+  const transcriptConfig = getTranscriptConfig(request);
+  console.log(`[Server] Prospect connected (${transcriptConfig.language})`);
+  deepgramProspect.connect(transcriptConfig);
   ws.on('message', (data) => deepgramProspect.send(data));
   ws.on('close', () => {
     console.log('[Server] Prospect disconnected');

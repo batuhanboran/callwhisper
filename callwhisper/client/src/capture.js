@@ -8,6 +8,11 @@ function getWsUrl(path) {
   return `${protocol}//${window.location.host}${path}`;
 }
 
+function withQuery(path, params) {
+  const query = new URLSearchParams(params).toString();
+  return query ? `${path}?${query}` : path;
+}
+
 function float32ToInt16(float32Array) {
   const int16 = new Int16Array(float32Array.length);
   for (let i = 0; i < float32Array.length; i++) {
@@ -93,7 +98,9 @@ async function createAudioSender(stream, wsPath, { onStatus, onLevel } = {}) {
   };
 }
 
-export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}) {
+export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}, options = {}) {
+  const transcriptLanguage = options.transcriptLanguage || 'multi';
+  const languageQuery = { language: transcriptLanguage };
   const constraints = (deviceId) => ({
     audio: {
       ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
@@ -137,11 +144,11 @@ export async function startCapture(micDeviceId, systemDeviceId, callbacks = {}) 
     }
 
     [repSender, prospectSender] = await Promise.all([
-      createAudioSender(micStream, '/audio-rep', {
+      createAudioSender(micStream, withQuery('/audio-rep', languageQuery), {
         onStatus: (s) => callbacks.onRepStatus?.(s),
         onLevel:  (v) => callbacks.onRepLevel?.(v),
       }),
-      createAudioSender(sysStream, '/audio-prospect', {
+      createAudioSender(sysStream, withQuery('/audio-prospect', languageQuery), {
         onStatus: (s) => callbacks.onProspectStatus?.(s),
         onLevel:  (v) => callbacks.onProspectLevel?.(v),
       }),

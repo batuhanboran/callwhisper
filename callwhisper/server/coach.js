@@ -15,6 +15,10 @@ Analyze the conversation and return ONLY a valid JSON object — no markdown, no
 }
 
 Rules:
+- Match the conversation language in all user-facing suggestions
+- If the latest actionable exchange is Turkish, write Turkish coaching
+- If it is English, write English coaching
+- If it is mixed, follow the user's most recent language and use natural mixed-language phrasing only when useful
 - Suggestions must be specific to THIS conversation, never generic
 - say_this and ask_this must sound natural when spoken aloud, under 20 words each
 - watch_out must name the exact signal (e.g. "Budget concern: prospect mentioned 'tight budget'")

@@ -2,6 +2,19 @@ const { createClient, LiveTranscriptionEvents } = require('@deepgram/sdk');
 
 const KEEPALIVE_INTERVAL = 8000;  // ms — prevent Deepgram idle timeout
 const RECONNECT_MAX_DELAY = 30000;
+const ALLOWED_TRANSCRIPT_LANGUAGES = new Set(['multi', 'en-US', 'tr']);
+const DEFAULT_DEEPGRAM_MODEL = process.env.DEEPGRAM_MODEL || 'nova-3';
+
+function getDefaultTranscriptLanguage() {
+  return ALLOWED_TRANSCRIPT_LANGUAGES.has(process.env.TRANSCRIPT_LANGUAGE)
+    ? process.env.TRANSCRIPT_LANGUAGE
+    : 'multi';
+}
+
+function getEndpointingMs() {
+  const value = parseInt(process.env.DEEPGRAM_ENDPOINTING_MS, 10);
+  return Number.isFinite(value) && value > 0 ? value : 100;
+}
 
 class DeepgramManager {
   constructor(speaker, transcript, wssEvents) {
@@ -17,6 +30,10 @@ class DeepgramManager {
     this.active = false;
     this.keepAliveTimer = null;
     this.reconnectTimer = null;
+    this.streamConfig = {
+      model: DEFAULT_DEEPGRAM_MODEL,
+      language: getDefaultTranscriptLanguage(),
+    };
   }
 
   updateKey(key) {
@@ -27,7 +44,13 @@ class DeepgramManager {
     if (this.active && !this.isConnected) this._open();
   }
 
-  connect() {
+  connect(config = {}) {
+    this.streamConfig = {
+      model: config.model || process.env.DEEPGRAM_MODEL || DEFAULT_DEEPGRAM_MODEL,
+      language: ALLOWED_TRANSCRIPT_LANGUAGES.has(config.language)
+        ? config.language
+        : getDefaultTranscriptLanguage(),
+    };
     if (this.isConnected) return;
     this.active = true;
     if (this.reconnectTimer) {
@@ -44,11 +67,9 @@ class DeepgramManager {
       this._broadcastStatus('waiting_for_key');
       return;
     }
-    console.log(`[Deepgram] Opening ${this.speaker} stream (attempt ${this.reconnectAttempts + 1})...`);
-
-    this.connection = this.client.listen.live({
-      model: 'nova-2',
-      language: process.env.TRANSCRIPT_LANGUAGE || 'en-US',
+    const liveOptions = {
+      model: this.streamConfig.model,
+      language: this.streamConfig.language,
       smart_format: true,
       encoding: 'linear16',
       channels: 1,
@@ -56,7 +77,17 @@ class DeepgramManager {
       interim_results: true,
       utterance_end_ms: 1000,
       vad_events: true,
-    });
+    };
+
+    if (this.streamConfig.language === 'multi') {
+      liveOptions.endpointing = getEndpointingMs();
+    }
+
+    console.log(
+      `[Deepgram] Opening ${this.speaker} stream (${liveOptions.model}/${liveOptions.language}, attempt ${this.reconnectAttempts + 1})...`
+    );
+
+    this.connection = this.client.listen.live(liveOptions);
 
     this.connection.on(LiveTranscriptionEvents.Open, () => {
       console.log(`[Deepgram] ${this.speaker} connected`);
@@ -83,6 +114,7 @@ class DeepgramManager {
         timestamp: new Date().toISOString(),
         is_final: data.is_final === true,
         confidence: alt.confidence ?? null,
+        languages: alt.languages || null,
       };
 
       if (entry.is_final) {

@@ -94,6 +94,7 @@ export default function App() {
   const [micId, setMicId] = useState('');
   const [sysId, setSysId] = useState('__display__');
   const [coachModel, setCoachModel] = useState('gemini-2.5-flash');
+  const [transcriptLanguage, setTranscriptLanguage] = useState('multi');
   const coachModelRef = useRef('gemini-2.5-flash');
   const [coachError, setCoachError] = useState(null);
   const [repName, setRepName] = useState('Rep (You)');
@@ -232,6 +233,8 @@ useEffect(() => {
         onRepLevel:       setRepLevel,
         onProspectStatus: setProspectStreamStatus,
         onProspectLevel:  setProspectLevel,
+      }, {
+        transcriptLanguage,
       });
       setSession(cap);
       runningRef.current = true;
@@ -355,6 +358,17 @@ useEffect(() => {
             <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
             <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
           </optgroup>
+        </select>
+        <select
+          style={{ ...styles.select, width: '150px' }}
+          value={transcriptLanguage}
+          onChange={(e) => setTranscriptLanguage(e.target.value)}
+          disabled={running}
+          title="Transcription language"
+        >
+          <option value="multi">Auto (best effort)</option>
+          <option value="en-US">English</option>
+          <option value="tr">Turkish</option>
         </select>
         <select style={styles.select} value={micId} onChange={(e) => setMicId(e.target.value)} disabled={running}>
           <option value="">— Rep mic —</option>
